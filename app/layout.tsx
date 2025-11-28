@@ -3,8 +3,10 @@ import { GoogleAnalytics, GoogleTagManager } from "@next/third-parties/google";
 import { Geist, Geist_Mono } from "next/font/google";
 import * as Sentry from "@sentry/nextjs";
 import { GA_MEASUREMENT_ID, hasGaMeasurementId } from "@/lib/analytics";
+import { ClerkProvider } from "@clerk/nextjs";
 
 import "./globals.css";
+import Header from "@/components/layout/header";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,18 +32,38 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {hasGaMeasurementId ? (
-          <>
-            <GoogleAnalytics gaId={GA_MEASUREMENT_ID} />
-            <GoogleTagManager gtmId={GA_MEASUREMENT_ID} />
-          </>
-        ) : null}
-        {children}
-      </body>
-    </html>
+    <ClerkProvider
+      appearance={{
+        variables: {
+          colorBackground: "white",
+        },
+        layout: {
+          termsPageUrl: "https://clerk.com/terms",
+          unsafe_disableDevelopmentModeWarnings: true,
+          socialButtonsPlacement: "bottom",
+          socialButtonsVariant: "iconButton",
+          logoPlacement: "outside",
+        },
+        captcha: {
+          size: "flexible",
+          language: "ko-KR",
+        },
+      }}
+    >
+      <html lang="en">
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        >
+          <Header />
+          {hasGaMeasurementId ? (
+            <>
+              <GoogleAnalytics gaId={GA_MEASUREMENT_ID} />
+              <GoogleTagManager gtmId={GA_MEASUREMENT_ID} />
+            </>
+          ) : null}
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

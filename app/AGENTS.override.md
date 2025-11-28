@@ -12,4 +12,3 @@
 ## 상태 관리
 - 우선 useState/useReducer.
 - 복잡한 상태만 명확한 이유로 Zustand 사용(기본은 서버 상태).
-- React Query 등 클라이언트 상태관리 라이브러리 미사용.
