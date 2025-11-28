@@ -14,7 +14,7 @@ handle text not null unique
 ## 처리 규칙
 - 온보딩을 통과한 모든 사용자는 `publicMetadata.handle`을 반드시 가진다 → 이를 단일 소스로 사용.
 - 동일 handle이 다른 user가 이미 보유하면 409로 응답한다.
-- display_name은 `last_name + first_name`을 그대로 사용한다(온보딩 상 존재).
+- display_name은 `username`을 사용한다.
 - 이벤트별 insert/update/delete로 처리하며, handle 충돌 시 409로 중단한다.
 
 ## Edge Function 예시
@@ -51,12 +51,12 @@ const HANDLE_CONFLICT_ERROR = "HANDLE_CONFLICT";
 const MISSING_HANDLE_ERROR = "MISSING_HANDLE";
 
 const resolveDisplayName = (payload: ClerkUserPayload): string =>
-  `${payload.last_name ?? ""}${payload.first_name ?? ""}`.trim();
+  (payload.username ?? "").trim();
 
 const resolveHandle = (payload: ClerkUserPayload): string =>
   typeof payload.public_metadata?.handle === "string"
     ? payload.public_metadata.handle.trim()
-    : "";
+    : (payload.username ?? "").trim();
 
 const ensureHandleAvailable = async (handle: string, userId: string) => {
   if (!handle) throw new Error(MISSING_HANDLE_ERROR);
@@ -114,6 +114,7 @@ Deno.serve(async (req) => {
   try {
     switch (event.type) {
       case "user.created": {
+        // handle은 username 또는 metadata.handle을 사용 (중복 검증은 user.created에서는 생략)
         const profilePayload = {
           user_id: userId,
           display_name: resolveDisplayName(payload),
