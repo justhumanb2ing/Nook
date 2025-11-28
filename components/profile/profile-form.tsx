@@ -12,8 +12,10 @@ import { Input } from "../ui/input";
 import { cn } from "@/lib/utils";
 
 type ProfileFormProps = {
-  defaultUsername: string;
-  currentAvatarUrl?: string;
+  handle: string;
+  isOwner: boolean;
+  profileDisplayName?: string;
+  profileAvatarUrl?: string;
 };
 
 const initialState: UpdateProfileActionState = { status: "idle" };
@@ -35,17 +37,21 @@ const SubmitButton = ({
 );
 
 export const ProfileForm = ({
-  defaultUsername,
-  currentAvatarUrl,
+  handle,
+  isOwner,
+  profileDisplayName,
+  profileAvatarUrl,
 }: ProfileFormProps) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
 
-  const [username, setUsername] = useState(defaultUsername);
+  const initialUsername = profileDisplayName ?? "";
+
+  const [username, setUsername] = useState(initialUsername);
   const [baselineUsername, setBaselineUsername] = useState(
-    defaultUsername.trim()
+    initialUsername.trim()
   );
-  const [avatarPreview, setAvatarPreview] = useState(currentAvatarUrl ?? "");
+  const [avatarPreview, setAvatarPreview] = useState(profileAvatarUrl ?? "");
   const [hasAvatarSelection, setHasAvatarSelection] = useState(false);
 
   const normalizedUsername = useMemo(() => username.trim(), [username]);
@@ -61,10 +67,12 @@ export const ProfileForm = ({
   }, []);
 
   const handleAvatarClick = () => {
+    if (!isOwner) return;
     fileInputRef.current?.click();
   };
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isOwner) return;
     const file = event.target.files?.[0];
 
     if (objectUrlRef.current) {
@@ -78,7 +86,7 @@ export const ProfileForm = ({
       setAvatarPreview(nextUrl);
       setHasAvatarSelection(true);
     } else {
-      setAvatarPreview(currentAvatarUrl ?? "");
+      setAvatarPreview(profileAvatarUrl ?? "");
       setHasAvatarSelection(false);
     }
   };
@@ -87,6 +95,8 @@ export const ProfileForm = ({
     prevState: UpdateProfileActionState,
     formData: FormData
   ) => {
+    if (!isOwner) return prevState;
+
     const loadingId = toastManager.add({
       title: "프로필 저장 중…",
       description: "잠시만 기다려 주세요.",
@@ -138,7 +148,8 @@ export const ProfileForm = ({
   );
 
   return (
-    <form action={formAction} className="space-y-5">
+    <form action={isOwner ? formAction : undefined} className="space-y-5">
+      <input type="hidden" name="handle" value={handle} />
       <div className="space-y-2">
         <div className="flex items-center gap-3">
           <input
@@ -182,6 +193,7 @@ export const ProfileForm = ({
           type="text"
           value={username}
           onChange={(event) => setUsername(event.target.value)}
+          readOnly={!isOwner}
           placeholder="새로운 사용자명"
           className={cn(
             "w-full rounded-md border-0 shadow-none px-3 py-2 !text-5xl !font-bold text-zinc-900 h-20 p-0",
@@ -189,7 +201,7 @@ export const ProfileForm = ({
           )}
         />
       </div>
-      <SubmitButton pending={isPending} disabled={!hasChanges} />
+      {isOwner && <SubmitButton pending={isPending} disabled={!hasChanges} />}
     </form>
   );
 };

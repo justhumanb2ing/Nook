@@ -22,6 +22,7 @@ export const updateProfileAction = async (
 
   const username = formData.get("username");
   const avatarFile = formData.get("avatar");
+  const handle = formData.get("handle");
 
   const result = await updateProfile({
     userId,
@@ -37,6 +38,10 @@ export const updateProfileAction = async (
     return { status: "error", message: "프로필 업데이트에 실패했어요.", reason: result.reason };
   }
 
-  revalidatePath("/profile");
+  if (typeof handle === "string" && handle.trim()) {
+    revalidatePath(`/profile/${handle.trim()}`);
+  } else {
+    revalidatePath("/profile");
+  }
   return { status: "success", message: "프로필이 업데이트되었습니다." };
 };
