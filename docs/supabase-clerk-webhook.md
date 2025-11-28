@@ -33,213 +33,144 @@
 ```ts
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.1";
-import { Webhook, type WebhookRequiredHeaders } from "https://esm.sh/svix@1.15.0";
-
-type ClerkEmailAddress = {
-  email_address: string;
-  id: string;
-};
-
-type ClerkUserPayload = {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  username: string | null;
-  image_url: string | null;
-  email_addresses?: ClerkEmailAddress[];
-  primary_email_address_id?: string | null;
-  public_metadata?: {
-    handle?: string | null;
-    [key: string]: unknown;
-  };
-};
-
-type ClerkWebhookEvent =
-  | { type: "user.created"; data: ClerkUserPayload }
-  | { type: "user.updated"; data: ClerkUserPayload }
-  | { type: "user.deleted"; data: ClerkUserPayload }
-  | { type: string; data: ClerkUserPayload };
-
+import { Webhook } from "https://esm.sh/svix@1.15.0";
 const supabaseUrl = Deno.env.get("SB_URL") ?? "";
 const supabaseServiceKey = Deno.env.get("SB_SERVICE_ROLE_KEY") ?? "";
 const clerkWebhookSecret = Deno.env.get("CLERK_WEBHOOK_SECRET") ?? "";
-
 const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
 });
-
 const HANDLE_CONFLICT_ERROR = "HANDLE_CONFLICT";
 const MISSING_HANDLE_ERROR = "MISSING_HANDLE";
-
-const sanitizeHandle = (raw: string): string =>
-  raw
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 50);
-
-const resolveRequestedHandle = (payload: ClerkUserPayload): string => {
-  const handle = payload.public_metadata?.handle;
-  if (typeof handle !== "string") return "";
-  return sanitizeHandle(handle);
-};
-
-const resolveDisplayName = (payload: ClerkUserPayload): string =>
-  `${payload.last_name ?? ""}${payload.first_name ?? ""}`.trim();
-
-const ensureProfileExists = async (payload: ClerkUserPayload) => {
+const resolveDisplayName = (payload)=>`${payload.last_name ?? ""}${payload.first_name ?? ""}`.trim();
+const ensureProfileExists = async (payload)=>{
   const userId = payload.id;
   const baseProfile = {
     user_id: userId,
     display_name: resolveDisplayName(payload),
     avatar_url: payload.image_url ?? null,
-    updated_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   };
-
-  const { error } = await supabase
-    .from("profile")
-    .upsert(baseProfile, { onConflict: "user_id" });
-
+  const { error } = await supabase.from("profile").upsert(baseProfile, {
+    onConflict: "user_id"
+  });
   if (error) {
     console.error("Profile upsert (base) failed", error);
     throw new Error("PROFILE_UPSERT_FAILED");
   }
 };
-
-const ensureHandle = async (
-  payload: ClerkUserPayload,
-): Promise<{ id: string; handle: string }> => {
+const ensureHandle = async (payload)=>{
   const userId = payload.id;
-  const handle = resolveRequestedHandle(payload);
-
-  if (!handle) {
-    throw new Error(MISSING_HANDLE_ERROR);
+  const handle = typeof payload.public_metadata?.handle === "string" ? payload.public_metadata.handle.trim() : "";
+  if (!handle) throw new Error(MISSING_HANDLE_ERROR);
+  // handle 유니크 키 기준 멱등 upsert
+  const { data, error } = await supabase.from("profile_handle").upsert({
+    user_id: userId,
+    handle,
+    is_primary: true
+  }, {
+    onConflict: "handle"
+  }).select("id, user_id, is_primary").single();
+  if (error || !data) {
+    console.error("Handle upsert failed", error);
+    throw new Error("HANDLE_INSERT_FAILED");
   }
-
-  const { data: existingHandle, error: handleLookupError } = await supabase
-    .from("profile_handle")
-    .select("id, user_id, is_primary")
-    .eq("handle", handle)
-    .maybeSingle();
-
-  if (handleLookupError) {
-    console.error("Handle lookup failed", handleLookupError);
-    throw new Error("HANDLE_LOOKUP_FAILED");
-  }
-
-  if (existingHandle && existingHandle.user_id !== userId) {
-    throw new Error(HANDLE_CONFLICT_ERROR);
-  }
-
-  let handleId = existingHandle?.id;
-
-  if (!handleId) {
-    const { data, error } = await supabase
-      .from("profile_handle")
-      .insert({ user_id: userId, handle, is_primary: true })
-      .select("id")
-      .single();
-
-    if (error || !data) {
-      console.error("Handle insert failed", error);
-      throw new Error("HANDLE_INSERT_FAILED");
-    }
-
-    handleId = data.id;
-  } else if (!existingHandle?.is_primary) {
-    const { error: promoteError } = await supabase
-      .from("profile_handle")
-      .update({ is_primary: true })
-      .eq("id", handleId);
-
+  if (data.user_id !== userId) throw new Error(HANDLE_CONFLICT_ERROR);
+  const handleId = data.id;
+  // 대표 핸들 승격
+  if (!data.is_primary) {
+    const { error: promoteError } = await supabase.from("profile_handle").update({
+      is_primary: true
+    }).eq("id", handleId);
     if (promoteError) {
       console.error("Handle promote failed", promoteError);
       throw new Error("HANDLE_PROMOTE_FAILED");
     }
   }
-
-  const { error: demoteError } = await supabase
-    .from("profile_handle")
-    .update({ is_primary: false })
-    .eq("user_id", userId)
-    .neq("id", handleId);
-
-  if (demoteError) {
-    console.error("Handle demote failed", demoteError);
-  }
-
-  return { id: handleId, handle };
+  // 동일 user의 다른 핸들 demote
+  const { error: demoteError } = await supabase.from("profile_handle").update({
+    is_primary: false
+  }).eq("user_id", userId).neq("id", handleId);
+  if (demoteError) console.error("Handle demote failed", demoteError);
+  return {
+    id: handleId,
+    handle
+  };
 };
-
 console.info("Clerk profile webhook started");
-
-Deno.serve(async (req) => {
+Deno.serve(async (req)=>{
   if (!supabaseUrl || !supabaseServiceKey || !clerkWebhookSecret) {
     console.error("Missing Supabase or Clerk env variables");
-    return new Response("Server misconfigured", { status: 500 });
+    return new Response("Server misconfigured", {
+      status: 500
+    });
   }
-
-  const headers: WebhookRequiredHeaders = {
+  const headers = {
     "svix-id": req.headers.get("svix-id") ?? "",
     "svix-timestamp": req.headers.get("svix-timestamp") ?? "",
-    "svix-signature": req.headers.get("svix-signature") ?? "",
+    "svix-signature": req.headers.get("svix-signature") ?? ""
   };
-
   const body = await req.text();
-
-  let event: ClerkWebhookEvent;
+  let event;
   try {
     const webhook = new Webhook(clerkWebhookSecret);
-    event = webhook.verify(body, headers) as ClerkWebhookEvent;
+    event = webhook.verify(body, headers);
   } catch (error) {
     console.error("Invalid webhook signature", error);
-    return new Response("Invalid signature", { status: 401 });
+    return new Response("Invalid signature", {
+      status: 401
+    });
   }
-
   const payload = event.data;
   const userId = payload?.id;
-
-  if (!userId) {
-    return new Response("Missing user id", { status: 400 });
-  }
-
+  if (!userId) return new Response("Missing user id", {
+    status: 400
+  });
   try {
     if (event.type === "user.deleted") {
       await supabase.from("profile").delete().eq("user_id", userId);
-      return new Response("deleted", { status: 200 });
+      return new Response("deleted", {
+        status: 200
+      });
     }
-
-    // FK 보호를 위해 handle 삽입 전에 profile 행을 보장
+    // FK 보호: profile 먼저 upsert
     await ensureProfileExists(payload);
-
     const primaryHandle = await ensureHandle(payload);
-    const { error: profileError } = await supabase
-      .from("profile")
-      .update({
-        display_name: resolveDisplayName(payload),
-        avatar_url: payload.image_url ?? null,
-        primary_handle_id: primaryHandle.id,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("user_id", userId);
-
+    const { error: profileError } = await supabase.from("profile").update({
+      display_name: resolveDisplayName(payload),
+      avatar_url: payload.image_url ?? null,
+      primary_handle_id: primaryHandle.id,
+      updated_at: new Date().toISOString()
+    }).eq("user_id", userId);
     if (profileError) {
       console.error("Supabase profile upsert error", profileError);
-      return new Response("Supabase error", { status: 500 });
+      return new Response("Supabase error", {
+        status: 500
+      });
     }
-
-    return new Response("ok", { status: 200 });
+    return new Response("ok", {
+      status: 200
+    });
   } catch (error) {
     if (error instanceof Error && error.message === MISSING_HANDLE_ERROR) {
       console.error("Missing handle in metadata", error);
-      return new Response("Missing handle in metadata", { status: 400 });
+      return new Response("Missing handle in metadata", {
+        status: 400
+      });
     }
     if (error instanceof Error && error.message === HANDLE_CONFLICT_ERROR) {
       console.error("Handle already in use", error);
-      return new Response("Handle conflict", { status: 409 });
+      return new Response("Handle conflict", {
+        status: 409
+      });
     }
     console.error("Unexpected error", error);
-    return new Response("error", { status: 500 });
+    return new Response("error", {
+      status: 500
+    });
   }
 });
 ```
