@@ -1,11 +1,6 @@
 import React from "react";
-import {
-  SignInButton,
-  SignUpButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
-} from "@clerk/nextjs";
+import Link from "next/link";
+import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 
 export default function Header() {
   return (
@@ -19,6 +14,12 @@ export default function Header() {
         </SignUpButton>
       </SignedOut>
       <SignedIn>
+        <Link
+          href="/profile"
+          className="rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 transition hover:bg-zinc-200"
+        >
+          내 프로필
+        </Link>
         <UserButton />
       </SignedIn>
     </header>
