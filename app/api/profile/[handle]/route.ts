@@ -10,14 +10,8 @@ type PagePayload = Pick<
   "id" | "handle" | "title" | "description" | "image_url" | "owner_id"
 >;
 
-type ProfilePayload = Pick<
-  Tables<"profile">,
-  "user_id" | "display_name" | "avatar_url"
->;
-
 type BffPayload = {
   page: PagePayload;
-  profile: ProfilePayload;
   isOwner: boolean;
 };
 
@@ -37,7 +31,7 @@ const buildHandleCandidates = (rawHandle: string): string[] => {
 const fetchPageAndProfile = async (
   supabase: SupabaseClient,
   handleCandidates: string[]
-): Promise<{ page: PagePayload; profile: ProfilePayload } | null> => {
+): Promise<{ page: PagePayload } | null> => {
   const { data: page, error: pageError } = await supabase
     .from("pages")
     .select("id, handle, title, description, image_url, owner_id")
@@ -49,16 +43,7 @@ const fetchPageAndProfile = async (
   if (pageError) throw pageError;
   if (!page) return null;
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profile")
-    .select("user_id, display_name, avatar_url")
-    .eq("user_id", page.owner_id)
-    .maybeSingle<ProfilePayload>();
-
-  if (profileError) throw profileError;
-  if (!profile) return null;
-
-  return { page, profile };
+  return { page };
 };
 
 export async function GET(
@@ -81,10 +66,9 @@ export async function GET(
 
     const isOwner = Boolean(userId && userId === result.page.owner_id);
 
-    return NextResponse.json(
-      { ...result, isOwner } satisfies BffPayload,
-      { status: 200 }
-    );
+    return NextResponse.json({ ...result, isOwner } satisfies BffPayload, {
+      status: 200,
+    });
   } catch (error) {
     Sentry.captureException(error);
     return NextResponse.json(

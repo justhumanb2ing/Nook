@@ -13,14 +13,8 @@ type PagePayload = Pick<
   "id" | "handle" | "title" | "description" | "image_url" | "owner_id"
 >;
 
-type ProfilePayload = Pick<
-  Tables<"profile">,
-  "user_id" | "display_name" | "avatar_url"
->;
-
 type BffResponse = {
   page: PagePayload;
-  profile: ProfilePayload;
   isOwner: boolean;
 };
 
@@ -63,7 +57,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     notFound();
   }
   console.log(result)
-  const { page, profile, isOwner } = result;
+  const { page, isOwner } = result;
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 p-6">
