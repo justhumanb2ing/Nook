@@ -52,6 +52,7 @@ export type Database = {
           description: string | null
           handle: string
           id: string
+          image_url: string | null
           is_public: boolean | null
           ordering: number | null
           owner_id: string
@@ -62,6 +63,7 @@ export type Database = {
           description?: string | null
           handle: string
           id?: string
+          image_url?: string | null
           is_public?: boolean | null
           ordering?: number | null
           owner_id: string
@@ -72,6 +74,7 @@ export type Database = {
           description?: string | null
           handle?: string
           id?: string
+          image_url?: string | null
           is_public?: boolean | null
           ordering?: number | null
           owner_id?: string

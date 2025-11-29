@@ -7,7 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 type PagePayload = Pick<
   Tables<"pages">,
-  "id" | "handle" | "title" | "description" | "owner_id"
+  "id" | "handle" | "title" | "description" | "image_url" | "owner_id"
 >;
 
 type ProfilePayload = Pick<
@@ -40,7 +40,7 @@ const fetchPageAndProfile = async (
 ): Promise<{ page: PagePayload; profile: ProfilePayload } | null> => {
   const { data: page, error: pageError } = await supabase
     .from("pages")
-    .select("id, handle, title, description, owner_id")
+    .select("id, handle, title, description, image_url, owner_id")
     .in("handle", handleCandidates)
     .order("ordering", { ascending: true, nullsFirst: true })
     .order("created_at", { ascending: true })

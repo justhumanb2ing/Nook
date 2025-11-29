@@ -10,7 +10,7 @@ type ProfilePageProps = {
 
 type PagePayload = Pick<
   Tables<"pages">,
-  "id" | "handle" | "title" | "description" | "owner_id"
+  "id" | "handle" | "title" | "description" | "image_url" | "owner_id"
 >;
 
 type ProfilePayload = Pick<
@@ -69,10 +69,12 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     <div className="mx-auto max-w-7xl space-y-8 p-6">
       <section className="space-y-6">
         <ProfileForm
+          pageId={page.id}
+          handle={page.handle}
           isOwner={isOwner}
           pageTitle={page.title ?? undefined}
           pageDescription={page.description ?? undefined}
-          profileAvatarUrl={profile.avatar_url ?? undefined}
+          pageImageUrl={page.image_url ?? undefined}
         />
       </section>
       {isOwner ? <BlockRegistryPanel /> : null}
