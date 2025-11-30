@@ -1,7 +1,13 @@
 import Image from "next/image";
 import type { Tables } from "@/types/database.types";
 
-import { Item } from "@/components/ui/item";
+import {
+  Item,
+  ItemContent,
+  ItemDescription,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
 
 type Block = Pick<Tables<"blocks">, "id" | "type" | "ordering" | "created_at">;
 
@@ -17,21 +23,27 @@ export const PageBlocks = ({ blocks }: PageBlocksProps) => {
         className="flex flex-col items-center space-y-3 max-w-sm text-center font-medium p-0 border-none bg-transparent shadow-none"
       >
         <section>
-          <div className="size-60">
-            <Image
-              src={"/none-data.png"}
-              alt="There's no data."
-              width={200}
-              height={200}
-              className="object-cover w-full h-full"
-              unoptimized
-            />
-          </div>
-          <p className="">이곳은 여전히 고요합니다.</p>
-          <p className="">
-            비어 있음은 결핍이 아니라, 당신이 채울 가능성들이 아직 이름을 얻지
-            않았다는 신호일지 모릅니다.
-          </p>
+          <Item className="flex flex-col justify-center items-center text-center">
+            <ItemMedia className="flex justify-center w-full">
+              <div className="size-32 rounded-full overflow-hidden">
+                <Image
+                  src={"/sprite-animation.gif"}
+                  alt="There's no data."
+                  width={200}
+                  height={200}
+                  className="object-cover w-full h-full grayscale"
+                  unoptimized
+                />
+              </div>
+            </ItemMedia>
+            <ItemContent className="items-center">
+              <ItemTitle className="text-base">이곳은 여전히 고요합니다.</ItemTitle>
+              <ItemDescription>
+                비어 있음은 결핍이 아니라, 당신이 채울 가능성들이 아직 이름을
+                얻지 않았다는 신호일지 모릅니다.
+              </ItemDescription>
+            </ItemContent>
+          </Item>
         </section>
       </Item>
     );
