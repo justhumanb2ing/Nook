@@ -8,7 +8,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import Header from "@/components/layout/header";
 
-import { AnchoredToastProvider, ToastProvider } from "@/components/ui/toast";
+import Providers from "./providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -63,9 +63,7 @@ export default function RootLayout({
               <GoogleTagManager gtmId={GA_MEASUREMENT_ID} />
             </>
           ) : null}
-          <ToastProvider position="bottom-center">
-            <AnchoredToastProvider>{children}</AnchoredToastProvider>
-          </ToastProvider>
+          <Providers>{children}</Providers>
         </body>
       </html>
     </ClerkProvider>

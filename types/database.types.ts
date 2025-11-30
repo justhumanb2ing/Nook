@@ -14,6 +14,171 @@ export type Database = {
   }
   public: {
     Tables: {
+      block_divider: {
+        Row: {
+          block_id: string
+        }
+        Insert: {
+          block_id: string
+        }
+        Update: {
+          block_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "block_divider_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: true
+            referencedRelation: "blocks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      block_image: {
+        Row: {
+          aspect_ratio: number | null
+          block_id: string
+          image_url: string
+          link_url: string | null
+        }
+        Insert: {
+          aspect_ratio?: number | null
+          block_id: string
+          image_url: string
+          link_url?: string | null
+        }
+        Update: {
+          aspect_ratio?: number | null
+          block_id?: string
+          image_url?: string
+          link_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "block_image_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: true
+            referencedRelation: "blocks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      block_link: {
+        Row: {
+          block_id: string
+          description: string | null
+          fetched_at: string | null
+          icon_url: string | null
+          image_url: string | null
+          title: string | null
+          url: string
+        }
+        Insert: {
+          block_id: string
+          description?: string | null
+          fetched_at?: string | null
+          icon_url?: string | null
+          image_url?: string | null
+          title?: string | null
+          url: string
+        }
+        Update: {
+          block_id?: string
+          description?: string | null
+          fetched_at?: string | null
+          icon_url?: string | null
+          image_url?: string | null
+          title?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "block_link_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: true
+            referencedRelation: "blocks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      block_map: {
+        Row: {
+          block_id: string
+          lat: number | null
+          lng: number | null
+          zoom: number | null
+        }
+        Insert: {
+          block_id: string
+          lat?: number | null
+          lng?: number | null
+          zoom?: number | null
+        }
+        Update: {
+          block_id?: string
+          lat?: number | null
+          lng?: number | null
+          zoom?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "block_map_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: true
+            referencedRelation: "blocks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      block_text: {
+        Row: {
+          block_id: string
+          content: string
+        }
+        Insert: {
+          block_id: string
+          content: string
+        }
+        Update: {
+          block_id?: string
+          content?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "block_text_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: true
+            referencedRelation: "blocks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      block_video: {
+        Row: {
+          block_id: string
+          thumbnail: string | null
+          video_url: string
+        }
+        Insert: {
+          block_id: string
+          thumbnail?: string | null
+          video_url: string
+        }
+        Update: {
+          block_id?: string
+          thumbnail?: string | null
+          video_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "block_video_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: true
+            referencedRelation: "blocks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blocks: {
         Row: {
           created_at: string | null
