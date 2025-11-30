@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,6 +9,8 @@ import { toastManager } from "@/components/ui/toast";
 type SaveResponse =
   | { status: "success"; blockId: string }
   | { status: "error"; reason?: string; message: string };
+
+type SaveStatus = "idle" | "saving" | "saved";
 
 const saveLinkBlock = async (params: {
   blockId: string;
@@ -72,6 +74,7 @@ export type LinkBlockEditorProps = {
   data: { url?: string | null; title?: string | null };
   onSavePlaceholder?: (data: { url: string; title: string }) => void;
   onCancelPlaceholder?: () => void;
+  onStatusChange: (status: SaveStatus) => void;
 };
 
 export const LinkBlockEditor = ({
@@ -82,75 +85,95 @@ export const LinkBlockEditor = ({
   data,
   onSavePlaceholder,
   onCancelPlaceholder,
+  onStatusChange,
 }: LinkBlockEditorProps) => {
   const [url, setUrl] = useState(data.url ?? "");
   const [title, setTitle] = useState(data.title ?? "");
-  const [isSaving, setIsSaving] = useState(false);
-  const isPristine =
-    url.trim() === (data.url?.trim() ?? "") &&
-    (title?.trim() ?? "") === (data.title?.trim() ?? "");
+  const [lastSaved, setLastSaved] = useState({
+    url: (data.url ?? "").trim(),
+    title: (data.title ?? "").trim(),
+  });
+  const resetTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const handleSave = async () => {
+  useEffect(() => {
+    setUrl(data.url ?? "");
+    setTitle(data.title ?? "");
+    setLastSaved({
+      url: (data.url ?? "").trim(),
+      title: (data.title ?? "").trim(),
+    });
+    onStatusChange("idle");
+  }, [data.url, data.title, onStatusChange]);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimer.current) clearTimeout(resetTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isOwner) return;
+
     const trimmedUrl = url.trim();
     const trimmedTitle = title.trim();
+    const hasChanges =
+      trimmedUrl !== lastSaved.url || trimmedTitle !== lastSaved.title;
 
-    if (!trimmedUrl || !trimmedTitle) {
-      toastManager.add({
-        title: "입력을 확인하세요",
-        description: "URL과 제목을 모두 입력해야 합니다.",
-        type: "warning",
-      });
+    if (!hasChanges) {
+      onStatusChange("idle");
       return;
     }
 
-    if (mode === "placeholder" && onSavePlaceholder) {
-      setIsSaving(true);
+    const debounceTimer = setTimeout(async () => {
+      onStatusChange("saving");
+
       try {
-        onSavePlaceholder({ url: trimmedUrl, title: trimmedTitle });
-      } finally {
-        setIsSaving(false);
+        if (mode === "placeholder" && onSavePlaceholder) {
+          await onSavePlaceholder({ url: trimmedUrl, title: trimmedTitle });
+        } else if (mode === "persisted" && blockId) {
+          const result = await saveLinkBlock({
+            blockId,
+            handle,
+            url: trimmedUrl,
+            title: trimmedTitle,
+          });
+          if (result.status === "error") {
+            throw new Error(result.message);
+          }
+        }
+
+        setLastSaved({ url: trimmedUrl, title: trimmedTitle });
+        onStatusChange("saved");
+
+        if (resetTimer.current) clearTimeout(resetTimer.current);
+        resetTimer.current = setTimeout(() => onStatusChange("idle"), 1500);
+      } catch (error) {
+        const description =
+          error instanceof Error
+            ? error.message
+            : "잠시 후 다시 시도해 주세요.";
+        toastManager.add({
+          title: "저장 실패",
+          description,
+          type: "error",
+        });
+        onStatusChange("idle");
       }
-      return;
-    }
+    }, 1200);
 
-    if (!blockId) return;
-
-    const toastId = toastManager.add({
-      title: "링크 저장 중…",
-      type: "loading",
-      timeout: 0,
-    });
-
-    setIsSaving(true);
-    try {
-      const result = await saveLinkBlock({
-        blockId,
-        handle,
-        url: trimmedUrl,
-        title: trimmedTitle,
-      });
-
-      if (result.status === "error") {
-        throw new Error(result.message);
-      }
-
-      toastManager.update(toastId, {
-        title: "링크가 저장되었습니다.",
-        type: "success",
-      });
-    } catch (error) {
-      const description =
-        error instanceof Error ? error.message : "잠시 후 다시 시도해 주세요.";
-      toastManager.update(toastId, {
-        title: "저장 실패",
-        description,
-        type: "error",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+    return () => clearTimeout(debounceTimer);
+  }, [
+    blockId,
+    handle,
+    isOwner,
+    lastSaved.title,
+    lastSaved.url,
+    mode,
+    onSavePlaceholder,
+    onStatusChange,
+    title,
+    url,
+  ]);
 
   return (
     <div className="space-y-2">
@@ -166,26 +189,13 @@ export const LinkBlockEditor = ({
         onChange={(e) => setTitle(e.target.value)}
         disabled={!isOwner}
       />
-      <div className="flex justify-end gap-2">
-        {mode === "placeholder" ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onCancelPlaceholder}
-            disabled={isSaving}
-          >
+      {mode === "placeholder" ? (
+        <div className="flex justify-end">
+          <Button size="sm" variant="ghost" onClick={onCancelPlaceholder}>
             취소
           </Button>
-        ) : null}
-        <Button
-          size="sm"
-          onClick={handleSave}
-          disabled={!isOwner || isSaving || isPristine}
-          aria-busy={isSaving}
-        >
-          {isSaving ? "저장 중…" : "저장"}
-        </Button>
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 };
@@ -198,6 +208,7 @@ export type TextBlockEditorProps = {
   data: { content?: string | null };
   onSavePlaceholder?: (data: { content: string }) => void;
   onCancelPlaceholder?: () => void;
+  onStatusChange: (status: SaveStatus) => void;
 };
 
 export const TextBlockEditor = ({
@@ -208,70 +219,80 @@ export const TextBlockEditor = ({
   data,
   onSavePlaceholder,
   onCancelPlaceholder,
+  onStatusChange,
 }: TextBlockEditorProps) => {
   const [content, setContent] = useState(data.content ?? "");
-  const [isSaving, setIsSaving] = useState(false);
-  const isPristine = (content?.trim() ?? "") === (data.content?.trim() ?? "");
+  const [lastSaved, setLastSaved] = useState((data.content ?? "").trim());
+  const resetTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const handleSave = async () => {
+  useEffect(() => {
+    setContent(data.content ?? "");
+    setLastSaved((data.content ?? "").trim());
+    onStatusChange("idle");
+  }, [data.content, onStatusChange]);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimer.current) clearTimeout(resetTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isOwner) return;
     const trimmed = content.trim();
+    const hasChanges = trimmed !== lastSaved;
 
-    if (!trimmed) {
-      toastManager.add({
-        title: "입력을 확인하세요",
-        description: "내용을 입력해주세요.",
-        type: "warning",
-      });
+    if (!hasChanges) {
+      onStatusChange("idle");
       return;
     }
 
-    if (mode === "placeholder" && onSavePlaceholder) {
-      setIsSaving(true);
+    const debounceTimer = setTimeout(async () => {
+      onStatusChange("saving");
       try {
-        onSavePlaceholder({ content: trimmed });
-      } finally {
-        setIsSaving(false);
+        if (mode === "placeholder" && onSavePlaceholder) {
+          await onSavePlaceholder({ content: trimmed });
+        } else if (mode === "persisted" && blockId) {
+          const result = await saveTextBlock({
+            blockId,
+            handle,
+            content: trimmed,
+          });
+          if (result.status === "error") {
+            throw new Error(result.message);
+          }
+        }
+
+        setLastSaved(trimmed);
+        onStatusChange("saved");
+
+        if (resetTimer.current) clearTimeout(resetTimer.current);
+        resetTimer.current = setTimeout(() => onStatusChange("idle"), 1500);
+      } catch (error) {
+        const description =
+          error instanceof Error
+            ? error.message
+            : "잠시 후 다시 시도해 주세요.";
+        toastManager.add({
+          title: "저장 실패",
+          description,
+          type: "error",
+        });
+        onStatusChange("idle");
       }
-      return;
-    }
+    }, 1200);
 
-    if (!blockId) return;
-
-    const toastId = toastManager.add({
-      title: "텍스트 저장 중…",
-      type: "loading",
-      timeout: 0,
-    });
-
-    setIsSaving(true);
-    try {
-      const result = await saveTextBlock({
-        blockId,
-        handle,
-        content: trimmed,
-      });
-
-      if (result.status === "error") {
-        throw new Error(result.message);
-      }
-
-      toastManager.update(toastId, {
-        title: "텍스트가 저장되었습니다.",
-        type: "success",
-      });
-    } catch (error) {
-      const description =
-        error instanceof Error ? error.message : "잠시 후 다시 시도해 주세요.";
-      toastManager.update(toastId, {
-        title: "저장 실패",
-        description,
-        type: "error",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+    return () => clearTimeout(debounceTimer);
+  }, [
+    blockId,
+    content,
+    handle,
+    isOwner,
+    lastSaved,
+    mode,
+    onSavePlaceholder,
+    onStatusChange,
+  ]);
 
   return (
     <div className="space-y-2">
@@ -282,26 +303,13 @@ export const TextBlockEditor = ({
         disabled={!isOwner}
         className="resize-none"
       />
-      <div className="flex justify-end gap-2">
-        {mode === "placeholder" ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onCancelPlaceholder}
-            disabled={isSaving}
-          >
+      {mode === "placeholder" ? (
+        <div className="flex justify-end">
+          <Button size="sm" variant="ghost" onClick={onCancelPlaceholder}>
             취소
           </Button>
-        ) : null}
-        <Button
-          size="sm"
-          onClick={handleSave}
-          disabled={!isOwner || isSaving || isPristine}
-          aria-busy={isSaving}
-        >
-          {isSaving ? "저장 중…" : "저장"}
-        </Button>
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 };

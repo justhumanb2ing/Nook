@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import type { BlockWithDetails } from "@/types/block";
 import type { BlockType } from "@/config/block-registry";
 import { BlockRegistryPanel } from "@/components/layout/block-registry";
@@ -16,6 +16,22 @@ type ProfileBlocksClientProps = {
   handle: string;
   pageId: string;
   isOwner: boolean;
+};
+
+type SaveStatus = "idle" | "saving" | "saved";
+
+const StatusBadge = ({ status }: { status: SaveStatus }) => {
+  const label =
+    status === "saving"
+      ? "변경 중"
+      : status === "saved"
+        ? "변경 완료"
+        : "변경 사항 없음";
+  return (
+    <div className="text-xs text-muted-foreground" aria-live="polite">
+      {label}
+    </div>
+  );
 };
 
 const requestCreateBlock = async (params: {
@@ -52,9 +68,11 @@ export const ProfileBlocksClient = ({
   isOwner,
 }: ProfileBlocksClientProps) => {
   const [items, setItems] = useState<BlockItem[]>(
-    initialBlocks.map((block) => ({ kind: "persisted", block }))
-  );
+      initialBlocks.map((block) => ({ kind: "persisted", block }))
+    );
   const [isPending, startTransition] = useTransition();
+  const [status, setStatus] = useState<SaveStatus>("idle");
+  const statusResetRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleAddPlaceholder = useCallback(
     (type: BlockType) => {
@@ -78,6 +96,7 @@ export const ProfileBlocksClient = ({
       if (!isOwner || isPending) return;
 
       startTransition(async () => {
+        setStatus("saving");
         const toastId = toastManager.add({
           title: "블록 생성 중…",
           type: "loading",
@@ -92,6 +111,7 @@ export const ProfileBlocksClient = ({
         });
 
         if (result.status === "error") {
+          setStatus("idle");
           toastManager.update(toastId, {
             title: "블록 생성 실패",
             description: result.message,
@@ -113,6 +133,9 @@ export const ProfileBlocksClient = ({
             return item;
           })
         );
+        setStatus("saved");
+        if (statusResetRef.current) clearTimeout(statusResetRef.current);
+        statusResetRef.current = setTimeout(() => setStatus("idle"), 1500);
       });
     },
     [handle, isOwner, isPending, pageId]
@@ -124,12 +147,14 @@ export const ProfileBlocksClient = ({
       {isOwner ? (
         <BlockRegistryPanel onSelectBlock={handleAddPlaceholder} />
       ) : null}
+      <StatusBadge status={status} />
       <PageBlocks
         items={visibleItems}
         handle={handle}
         isOwner={isOwner}
         onSavePlaceholder={handleSavePlaceholder}
         onCancelPlaceholder={handleCancelPlaceholder}
+        onStatusChange={setStatus}
       />
     </div>
   );

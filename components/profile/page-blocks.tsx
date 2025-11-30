@@ -36,21 +36,7 @@ type PageBlocksProps = {
     data: Record<string, unknown>
   ) => void;
   onCancelPlaceholder: (placeholderId: string) => void;
-};
-
-const extractLinkData = (
-  block?: BlockWithDetails
-): { url?: string | null; title?: string | null } => {
-  if (!block) return {};
-  const rawData =
-    typeof block === "object" && "data" in block && block.data && typeof block.data === "object"
-      ? (block.data as Record<string, unknown>)
-      : undefined;
-
-  return {
-    url: block.link_url ?? (rawData?.url as string | undefined) ?? null,
-    title: block.title ?? (rawData?.title as string | undefined) ?? null,
-  };
+  onStatusChange: (status: "idle" | "saving" | "saved") => void;
 };
 
 const extractTextData = (
@@ -58,7 +44,10 @@ const extractTextData = (
 ): { content?: string | null } => {
   if (!block) return {};
   const rawData =
-    typeof block === "object" && "data" in block && block.data && typeof block.data === "object"
+    typeof block === "object" &&
+    "data" in block &&
+    block.data &&
+    typeof block.data === "object"
       ? (block.data as Record<string, unknown>)
       : undefined;
 
@@ -73,6 +62,7 @@ export const PageBlocks = ({
   isOwner,
   onSavePlaceholder,
   onCancelPlaceholder,
+  onStatusChange,
 }: PageBlocksProps) => {
   const sortedBlocks = useMemo(
     () =>
@@ -141,7 +131,7 @@ export const PageBlocks = ({
           const block = item.kind === "persisted" ? item.block : undefined;
           const type = item.kind === "persisted" ? item.block.type : item.type;
           const blockId = block?.id;
-
+          
           return (
             <div
               key={item.kind === "persisted" ? item.block.id : item.id}
@@ -157,15 +147,12 @@ export const PageBlocks = ({
                           blockId={blockId}
                           handle={handle}
                           isOwner={isOwner}
-                          data={extractLinkData(block)}
+                          data={block as BlockWithDetails}
+                          onStatusChange={onStatusChange}
                           onSavePlaceholder={
                             isPlaceholder
                               ? (data) =>
-                                  onSavePlaceholder(
-                                    item.id,
-                                    "link",
-                                    data
-                                  )
+                                  onSavePlaceholder(item.id, "link", data)
                               : undefined
                           }
                           onCancelPlaceholder={
@@ -183,14 +170,11 @@ export const PageBlocks = ({
                           handle={handle}
                           isOwner={isOwner}
                           data={extractTextData(block)}
+                          onStatusChange={onStatusChange}
                           onSavePlaceholder={
                             isPlaceholder
                               ? (data) =>
-                                  onSavePlaceholder(
-                                    item.id,
-                                    "text",
-                                    data
-                                  )
+                                  onSavePlaceholder(item.id, "text", data)
                               : undefined
                           }
                           onCancelPlaceholder={
