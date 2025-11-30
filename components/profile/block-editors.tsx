@@ -29,9 +29,7 @@ const saveLinkBlock = async (params: {
       status: "error",
       reason: data.status === "error" ? data.reason : "REQUEST_FAILED",
       message:
-        data.status === "error"
-          ? data.message
-          : "링크를 저장하지 못했습니다.",
+        data.status === "error" ? data.message : "링크를 저장하지 못했습니다.",
     };
   }
 
@@ -213,8 +211,7 @@ export const TextBlockEditor = ({
 }: TextBlockEditorProps) => {
   const [content, setContent] = useState(data.content ?? "");
   const [isSaving, setIsSaving] = useState(false);
-  const isPristine =
-    (content?.trim() ?? "") === (data.content?.trim() ?? "");
+  const isPristine = (content?.trim() ?? "") === (data.content?.trim() ?? "");
 
   const handleSave = async () => {
     if (!isOwner) return;
@@ -283,6 +280,7 @@ export const TextBlockEditor = ({
         value={content}
         onChange={(e) => setContent(e.target.value)}
         disabled={!isOwner}
+        className="resize-none"
       />
       <div className="flex justify-end gap-2">
         {mode === "placeholder" ? (

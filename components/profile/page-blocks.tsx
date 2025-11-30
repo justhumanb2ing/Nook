@@ -141,31 +141,12 @@ export const PageBlocks = ({
           const block = item.kind === "persisted" ? item.block : undefined;
           const type = item.kind === "persisted" ? item.block.type : item.type;
           const blockId = block?.id;
-          const createdAt =
-            item.kind === "persisted" ? item.block.created_at : null;
 
           return (
             <div
               key={item.kind === "persisted" ? item.block.id : item.id}
               className="rounded-lg border border-zinc-200 p-3 shadow-sm"
             >
-              <div className="flex items-center justify-between">
-                <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-800 capitalize">
-                  {type}
-                  {isPlaceholder ? " (임시)" : ""}
-                </span>
-                {block?.ordering !== null && block?.ordering !== undefined ? (
-                  <span className="text-xs text-zinc-500">
-                    #{block.ordering}
-                  </span>
-                ) : null}
-              </div>
-              <p className="mt-2 text-xs text-zinc-500">
-                {createdAt
-                  ? new Date(createdAt).toLocaleString()
-                  : "임시 블록"}
-              </p>
-
               <div className="mt-3 space-y-3">
                 {(() => {
                   switch (type) {
