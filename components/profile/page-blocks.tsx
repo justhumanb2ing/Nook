@@ -131,13 +131,13 @@ export const PageBlocks = ({
           const block = item.kind === "persisted" ? item.block : undefined;
           const type = item.kind === "persisted" ? item.block.type : item.type;
           const blockId = block?.id;
-          
+
           return (
             <div
               key={item.kind === "persisted" ? item.block.id : item.id}
               className="rounded-lg border border-zinc-200 p-3 shadow-sm"
             >
-              <div className="mt-3 space-y-3">
+              <div className="space-y-3">
                 {(() => {
                   switch (type) {
                     case "link":
