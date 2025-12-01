@@ -1,8 +1,7 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { ProfileForm } from "@/components/profile/profile-form";
 import type { ProfileBffPayload } from "@/types/profile";
-import { ProfileBlocksClient } from "@/components/profile/profile-blocks-client";
+import { ProfilePageClient } from "@/components/profile/profile-page-client";
 
 type ProfilePageProps = {
   params: Promise<{ handle: string }>;
@@ -50,24 +49,5 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
   const { page, isOwner, blocks } = result;
 
-  return (
-    <div className="mx-auto max-w-7xl space-y-8 p-6">
-      <section className="space-y-6">
-        <ProfileForm
-          pageId={page.id}
-          handle={page.handle}
-          isOwner={isOwner}
-          pageTitle={page.title ?? undefined}
-          pageDescription={page.description ?? undefined}
-          pageImageUrl={page.image_url ?? undefined}
-        />
-      </section>
-      <ProfileBlocksClient
-        initialBlocks={blocks}
-        handle={page.handle}
-        pageId={page.id}
-        isOwner={isOwner}
-      />
-    </div>
-  );
+  return <ProfilePageClient page={page} blocks={blocks} isOwner={isOwner} />;
 }

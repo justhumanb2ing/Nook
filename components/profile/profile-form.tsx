@@ -45,9 +45,11 @@ export function ProfileForm({
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit(onSubmit)}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void form.handleSubmit(onSubmit)();
+        }}
         className="space-y-5"
-        // aria-disabled={!isOwner}
       >
         <input type="hidden" {...form.register("pageId")} />
         <input type="hidden" {...form.register("handle")} />
@@ -103,7 +105,7 @@ export function ProfileForm({
                 <Input
                   placeholder="페이지 제목"
                   className={cn(
-                    "w-full rounded-md border-0 shadow-none px-3 py-2 !text-5xl !font-bold text-zinc-900 h-20 p-0",
+                    "w-full rounded-md border-0 shadow-none px-3 py-2 text-5xl! font-bold! text-zinc-900 h-20 p-0",
                     "focus:outline-none focus:ring-0 focus-visible:ring-0"
                   )}
                   readOnly={!isOwner}
@@ -125,7 +127,7 @@ export function ProfileForm({
                   placeholder="페이지 설명을 입력하세요"
                   className={cn(
                     "w-full border-none rounded-none shadow-none p-0 text-zinc-900 min-h-[120px] resize-none",
-                    "focus-visible:outline-none focus-visible:ring-0 !text-lg"
+                    "focus-visible:outline-none focus-visible:ring-0 text-lg!"
                   )}
                   readOnly={!isOwner}
                   {...field}
@@ -135,15 +137,6 @@ export function ProfileForm({
             </FormItem>
           )}
         />
-
-        <Button
-          type="submit"
-          disabled={
-            !isOwner || !form.formState.isDirty || form.formState.isSubmitting
-          }
-        >
-          {form.formState.isSubmitting ? "저장 중…" : "저장"}
-        </Button>
       </form>
     </Form>
   );

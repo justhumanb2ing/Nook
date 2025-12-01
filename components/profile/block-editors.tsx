@@ -5,12 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toastManager } from "@/components/ui/toast";
+import { useSaveStatus, type SaveStatus } from "@/components/profile/save-status-context";
 
 type SaveResponse =
   | { status: "success"; blockId: string }
   | { status: "error"; reason?: string; message: string };
-
-type SaveStatus = "idle" | "saving" | "saved";
 
 const saveLinkBlock = async (params: {
   blockId: string;
@@ -74,7 +73,6 @@ export type LinkBlockEditorProps = {
   data: { url?: string | null; title?: string | null };
   onSavePlaceholder?: (data: { url: string; title: string }) => void;
   onCancelPlaceholder?: () => void;
-  onStatusChange: (status: SaveStatus) => void;
 };
 
 export const LinkBlockEditor = ({
@@ -85,25 +83,25 @@ export const LinkBlockEditor = ({
   data,
   onSavePlaceholder,
   onCancelPlaceholder,
-  onStatusChange,
 }: LinkBlockEditorProps) => {
+  const { setStatus } = useSaveStatus();
   const [url, setUrl] = useState(data.url ?? "");
   const [title, setTitle] = useState(data.title ?? "");
   const [lastSaved, setLastSaved] = useState({
     url: (data.url ?? "").trim(),
     title: (data.title ?? "").trim(),
   });
-  const resetTimer = useRef<NodeJS.Timeout | null>(null);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setUrl(data.url ?? "");
-    setTitle(data.title ?? "");
+    // 초기 데이터만 반영하고 상태는 유지
+    setUrl((prev) => (prev === "" ? data.url ?? "" : prev));
+    setTitle((prev) => (prev === "" ? data.title ?? "" : prev));
     setLastSaved({
       url: (data.url ?? "").trim(),
       title: (data.title ?? "").trim(),
     });
-    onStatusChange("idle");
-  }, [data.url, data.title, onStatusChange]);
+  }, [data.url, data.title]);
 
   useEffect(() => {
     return () => {
@@ -120,16 +118,16 @@ export const LinkBlockEditor = ({
       trimmedUrl !== lastSaved.url || trimmedTitle !== lastSaved.title;
 
     if (!hasChanges) {
-      onStatusChange("idle");
       return;
     }
 
+    setStatus("dirty");
     const debounceTimer = setTimeout(async () => {
-      onStatusChange("saving");
+      setStatus("saving");
 
       try {
         if (mode === "placeholder" && onSavePlaceholder) {
-          await onSavePlaceholder({ url: trimmedUrl, title: trimmedTitle });
+          onSavePlaceholder({ url: trimmedUrl, title: trimmedTitle });
         } else if (mode === "persisted" && blockId) {
           const result = await saveLinkBlock({
             blockId,
@@ -143,21 +141,19 @@ export const LinkBlockEditor = ({
         }
 
         setLastSaved({ url: trimmedUrl, title: trimmedTitle });
-        onStatusChange("saved");
+        setStatus("saved");
 
         if (resetTimer.current) clearTimeout(resetTimer.current);
-        resetTimer.current = setTimeout(() => onStatusChange("idle"), 1500);
+        resetTimer.current = setTimeout(() => setStatus("idle"), 1500);
       } catch (error) {
         const description =
-          error instanceof Error
-            ? error.message
-            : "잠시 후 다시 시도해 주세요.";
+          error instanceof Error ? error.message : "잠시 후 다시 시도해 주세요.";
         toastManager.add({
           title: "저장 실패",
           description,
           type: "error",
         });
-        onStatusChange("idle");
+        setStatus("error");
       }
     }, 1200);
 
@@ -170,7 +166,7 @@ export const LinkBlockEditor = ({
     lastSaved.url,
     mode,
     onSavePlaceholder,
-    onStatusChange,
+    setStatus,
     title,
     url,
   ]);
@@ -208,7 +204,6 @@ export type TextBlockEditorProps = {
   data: { content?: string | null };
   onSavePlaceholder?: (data: { content: string }) => void;
   onCancelPlaceholder?: () => void;
-  onStatusChange: (status: SaveStatus) => void;
 };
 
 export const TextBlockEditor = ({
@@ -219,17 +214,16 @@ export const TextBlockEditor = ({
   data,
   onSavePlaceholder,
   onCancelPlaceholder,
-  onStatusChange,
 }: TextBlockEditorProps) => {
+  const { setStatus } = useSaveStatus();
   const [content, setContent] = useState(data.content ?? "");
   const [lastSaved, setLastSaved] = useState((data.content ?? "").trim());
-  const resetTimer = useRef<NodeJS.Timeout | null>(null);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setContent(data.content ?? "");
+    setContent((prev) => (prev === "" ? data.content ?? "" : prev));
     setLastSaved((data.content ?? "").trim());
-    onStatusChange("idle");
-  }, [data.content, onStatusChange]);
+  }, [data.content]);
 
   useEffect(() => {
     return () => {
@@ -243,12 +237,12 @@ export const TextBlockEditor = ({
     const hasChanges = trimmed !== lastSaved;
 
     if (!hasChanges) {
-      onStatusChange("idle");
       return;
     }
 
+    setStatus("dirty");
     const debounceTimer = setTimeout(async () => {
-      onStatusChange("saving");
+      setStatus("saving");
       try {
         if (mode === "placeholder" && onSavePlaceholder) {
           await onSavePlaceholder({ content: trimmed });
@@ -264,21 +258,19 @@ export const TextBlockEditor = ({
         }
 
         setLastSaved(trimmed);
-        onStatusChange("saved");
+        setStatus("saved");
 
         if (resetTimer.current) clearTimeout(resetTimer.current);
-        resetTimer.current = setTimeout(() => onStatusChange("idle"), 1500);
+        resetTimer.current = setTimeout(() => setStatus("idle"), 1500);
       } catch (error) {
         const description =
-          error instanceof Error
-            ? error.message
-            : "잠시 후 다시 시도해 주세요.";
+          error instanceof Error ? error.message : "잠시 후 다시 시도해 주세요.";
         toastManager.add({
           title: "저장 실패",
           description,
           type: "error",
         });
-        onStatusChange("idle");
+        setStatus("error");
       }
     }, 1200);
 
@@ -291,7 +283,7 @@ export const TextBlockEditor = ({
     lastSaved,
     mode,
     onSavePlaceholder,
-    onStatusChange,
+    setStatus,
   ]);
 
   return (
@@ -301,7 +293,6 @@ export const TextBlockEditor = ({
         value={content}
         onChange={(e) => setContent(e.target.value)}
         disabled={!isOwner}
-        className="resize-none"
       />
       {mode === "placeholder" ? (
         <div className="flex justify-end">

@@ -110,7 +110,7 @@ export const POST = async (req: Request) => {
     return NextResponse.json(
       {
         status: "success",
-        block: created,
+        block: created
       },
       { status: 200 }
     );

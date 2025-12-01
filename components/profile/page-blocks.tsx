@@ -20,6 +20,7 @@ import {
   LinkBlockEditor,
   TextBlockEditor,
 } from "@/components/profile/block-editors";
+import { useSaveStatus } from "@/components/profile/save-status-context";
 
 type PlaceholderBlock = { kind: "placeholder"; id: string; type: BlockType };
 type PersistedBlock = { kind: "persisted"; block: BlockWithDetails };
@@ -36,23 +37,24 @@ type PageBlocksProps = {
     data: Record<string, unknown>
   ) => void;
   onCancelPlaceholder: (placeholderId: string) => void;
-  onStatusChange: (status: "idle" | "saving" | "saved") => void;
+};
+
+const extractLinkData = (
+  block?: BlockWithDetails
+): { url?: string | null; title?: string | null } => {
+  if (!block) return {};
+  return {
+    url: block.url ?? null,
+    title: block.title ?? null,
+  };
 };
 
 const extractTextData = (
   block?: BlockWithDetails
 ): { content?: string | null } => {
   if (!block) return {};
-  const rawData =
-    typeof block === "object" &&
-    "data" in block &&
-    block.data &&
-    typeof block.data === "object"
-      ? (block.data as Record<string, unknown>)
-      : undefined;
-
   return {
-    content: block.content ?? (rawData?.content as string | undefined) ?? null,
+    content: block.content ?? null,
   };
 };
 
@@ -62,8 +64,8 @@ export const PageBlocks = ({
   isOwner,
   onSavePlaceholder,
   onCancelPlaceholder,
-  onStatusChange,
 }: PageBlocksProps) => {
+  const { setStatus } = useSaveStatus();
   const sortedBlocks = useMemo(
     () =>
       [...items].sort((a, b) => {
@@ -131,13 +133,13 @@ export const PageBlocks = ({
           const block = item.kind === "persisted" ? item.block : undefined;
           const type = item.kind === "persisted" ? item.block.type : item.type;
           const blockId = block?.id;
-
+          
           return (
             <div
               key={item.kind === "persisted" ? item.block.id : item.id}
               className="rounded-lg border border-zinc-200 p-3 shadow-sm"
             >
-              <div className="space-y-3">
+              <div className="mt-3 space-y-3">
                 {(() => {
                   switch (type) {
                     case "link":
@@ -147,12 +149,13 @@ export const PageBlocks = ({
                           blockId={blockId}
                           handle={handle}
                           isOwner={isOwner}
-                          data={block as BlockWithDetails}
-                          onStatusChange={onStatusChange}
+                          data={extractLinkData(block)}
                           onSavePlaceholder={
                             isPlaceholder
-                              ? (data) =>
-                                  onSavePlaceholder(item.id, "link", data)
+                              ? (data) => {
+                                  setStatus("dirty");
+                                  onSavePlaceholder(item.id, "link", data);
+                                }
                               : undefined
                           }
                           onCancelPlaceholder={
@@ -170,11 +173,12 @@ export const PageBlocks = ({
                           handle={handle}
                           isOwner={isOwner}
                           data={extractTextData(block)}
-                          onStatusChange={onStatusChange}
                           onSavePlaceholder={
                             isPlaceholder
-                              ? (data) =>
-                                  onSavePlaceholder(item.id, "text", data)
+                              ? (data) => {
+                                  setStatus("dirty");
+                                  onSavePlaceholder(item.id, "text", data);
+                                }
                               : undefined
                           }
                           onCancelPlaceholder={

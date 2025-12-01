@@ -3,7 +3,6 @@ import * as Sentry from "@sentry/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { createServerSupabaseClient } from "@/config/supabase";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { BlockWithDetails } from "@/types/block";
 import type { PagePayload, ProfileBffPayload } from "@/types/profile";
 
 const normalizeHandle = (rawHandle: string): string =>
@@ -67,7 +66,7 @@ export async function GET(
       {
         page,
         isOwner,
-        blocks: (blocks ?? []) as BlockWithDetails[],
+        blocks: blocks ?? [],
       } satisfies ProfileBffPayload,
       {
         status: 200,

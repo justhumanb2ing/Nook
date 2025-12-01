@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import type { BlockWithDetails } from "@/types/block";
 import type { BlockType } from "@/config/block-registry";
 import { BlockRegistryPanel } from "@/components/layout/block-registry";
 import { PageBlocks } from "@/components/profile/page-blocks";
 import { toastManager } from "@/components/ui/toast";
+import { useSaveStatus } from "@/components/profile/save-status-context";
 
 type BlockItem =
   | { kind: "persisted"; block: BlockWithDetails }
@@ -18,28 +19,15 @@ type ProfileBlocksClientProps = {
   isOwner: boolean;
 };
 
-type SaveStatus = "idle" | "saving" | "saved";
-
-const StatusBadge = ({ status }: { status: SaveStatus }) => {
-  const label =
-    status === "saving"
-      ? "변경 중"
-      : status === "saved"
-        ? "변경 완료"
-        : "변경 사항 없음";
-  return (
-    <div className="text-xs text-muted-foreground" aria-live="polite">
-      {label}
-    </div>
-  );
-};
-
 const requestCreateBlock = async (params: {
   pageId: string;
   handle: string;
   type: BlockType;
   data: Record<string, unknown>;
-}): Promise<{ status: "success"; block: BlockWithDetails } | { status: "error"; message: string }> => {
+}): Promise<
+  | { status: "success"; block: BlockWithDetails }
+  | { status: "error"; message: string }
+> => {
   const response = await fetch("/api/profile/block", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -51,10 +39,7 @@ const requestCreateBlock = async (params: {
   if (!response.ok || body.status === "error") {
     return {
       status: "error",
-      message:
-        body?.message ??
-        body?.reason ??
-        "블록을 생성하지 못했습니다.",
+      message: body?.message ?? body?.reason ?? "블록을 생성하지 못했습니다.",
     };
   }
 
@@ -68,28 +53,32 @@ export const ProfileBlocksClient = ({
   isOwner,
 }: ProfileBlocksClientProps) => {
   const [items, setItems] = useState<BlockItem[]>(
-      initialBlocks.map((block) => ({ kind: "persisted", block }))
-    );
+    initialBlocks.map((block) => ({ kind: "persisted", block }))
+  );
   const [isPending, startTransition] = useTransition();
-  const [status, setStatus] = useState<SaveStatus>("idle");
-  const statusResetRef = useRef<NodeJS.Timeout | null>(null);
+  const { setStatus } = useSaveStatus();
 
   const handleAddPlaceholder = useCallback(
     (type: BlockType) => {
       if (!isOwner) return;
       const tempId = crypto.randomUUID();
       setItems((prev) => [...prev, { kind: "placeholder", id: tempId, type }]);
+      setStatus("dirty");
     },
-    [isOwner]
+    [isOwner, setStatus]
   );
 
-  const handleCancelPlaceholder = useCallback((placeholderId: string) => {
-    setItems((prev) =>
-      prev.filter(
-        (item) => !(item.kind === "placeholder" && item.id === placeholderId)
-      )
-    );
-  }, []);
+  const handleCancelPlaceholder = useCallback(
+    (placeholderId: string) => {
+      setItems((prev) =>
+        prev.filter(
+          (item) => !(item.kind === "placeholder" && item.id === placeholderId)
+        )
+      );
+      setStatus("idle");
+    },
+    [setStatus]
+  );
 
   const handleSavePlaceholder = useCallback(
     (placeholderId: string, type: BlockType, data: Record<string, unknown>) => {
@@ -111,7 +100,7 @@ export const ProfileBlocksClient = ({
         });
 
         if (result.status === "error") {
-          setStatus("idle");
+          setStatus("error");
           toastManager.update(toastId, {
             title: "블록 생성 실패",
             description: result.message,
@@ -128,33 +117,33 @@ export const ProfileBlocksClient = ({
         setItems((prev) =>
           prev.map((item) => {
             if (item.kind === "placeholder" && item.id === placeholderId) {
-              return { kind: "persisted", block: result.block };
+              return {
+                kind: "persisted",
+                block: result.block,
+              };
             }
             return item;
           })
         );
         setStatus("saved");
-        if (statusResetRef.current) clearTimeout(statusResetRef.current);
-        statusResetRef.current = setTimeout(() => setStatus("idle"), 1500);
       });
     },
-    [handle, isOwner, isPending, pageId]
+    [handle, isOwner, isPending, pageId, setStatus]
   );
 
   const visibleItems = useMemo(() => items, [items]);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {isOwner ? (
         <BlockRegistryPanel onSelectBlock={handleAddPlaceholder} />
       ) : null}
-      <StatusBadge status={status} />
       <PageBlocks
         items={visibleItems}
         handle={handle}
         isOwner={isOwner}
         onSavePlaceholder={handleSavePlaceholder}
         onCancelPlaceholder={handleCancelPlaceholder}
-        onStatusChange={setStatus}
       />
     </div>
   );

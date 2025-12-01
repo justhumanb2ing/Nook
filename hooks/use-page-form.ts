@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toastManager } from "@/components/ui/toast";
+import { useSaveStatus } from "@/components/profile/save-status-context";
 
 const PageSchema = z.object({
   pageId: z.string(),
@@ -85,6 +86,8 @@ export const usePageForm = ({
   pageDescription,
   pageImageUrl,
 }: UsePageFormParams) => {
+  const { setStatus } = useSaveStatus();
+  const wasDirtyRef = useRef<boolean>(false);
   const form = useForm<PageSchemaType>({
     resolver: zodResolver(PageSchema),
     defaultValues: {
@@ -115,8 +118,26 @@ export const usePageForm = ({
     };
   }, [preview, watchedImage]);
 
+  useEffect(() => {
+    if (form.formState.isSubmitting || !isOwner) return;
+    if (form.formState.isDirty && !wasDirtyRef.current) {
+      wasDirtyRef.current = true;
+      setStatus("dirty");
+    }
+  }, [form.formState.isDirty, form.formState.isSubmitting, isOwner, setStatus]);
+
+  useEffect(() => {
+    if (!isOwner) return;
+    if (!form.formState.isDirty || form.formState.isSubmitting) return;
+    const timer = setTimeout(() => {
+      form.handleSubmit(onSubmit)();
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [form, form.formState.isDirty, form.formState.isSubmitting, isOwner]);
+
   const onSubmit = useCallback(
     async (data: PageSchemaType) => {
+      setStatus("saving");
       const loadingId = toastManager.add({
         title: "저장 중…",
         type: "loading",
@@ -152,18 +173,23 @@ export const usePageForm = ({
           image: undefined,
           imageUrl: resolvedImageUrl,
         });
+        setStatus("saved");
+        wasDirtyRef.current = false;
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : "잠시 후 다시 시도해 주세요.";
+          error instanceof Error
+            ? error.message
+            : "잠시 후 다시 시도해 주세요.";
 
         toastManager.update(loadingId, {
           title: "저장 실패",
           description: message,
           type: "error",
         });
+        setStatus("error");
       }
     },
-    [form, pageImageUrl, preview]
+    [form, pageImageUrl, preview, setStatus]
   );
 
   return { form, preview, isOwner, onSubmit };
