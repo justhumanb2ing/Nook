@@ -11,7 +11,6 @@ import {
 import { Item } from "@/components/ui/item";
 
 type HeaderClientProps = {
-  profileHref: string;
   pageLinks: Array<{ id: string; href: string; label: string }>;
 };
 
@@ -39,10 +38,7 @@ const PageLinks = ({
     </Item>
   ) : null;
 
-export default function HeaderClient({
-  profileHref,
-  pageLinks,
-}: HeaderClientProps) {
+export default function HeaderClient({ pageLinks }: HeaderClientProps) {
   return (
     <Item
       asChild

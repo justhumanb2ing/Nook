@@ -126,15 +126,6 @@ export const usePageForm = ({
     }
   }, [form.formState.isDirty, form.formState.isSubmitting, isOwner, setStatus]);
 
-  useEffect(() => {
-    if (!isOwner) return;
-    if (!form.formState.isDirty || form.formState.isSubmitting) return;
-    const timer = setTimeout(() => {
-      form.handleSubmit(onSubmit)();
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, [form, form.formState.isDirty, form.formState.isSubmitting, isOwner]);
-
   const onSubmit = useCallback(
     async (data: PageSchemaType) => {
       setStatus("saving");
@@ -189,8 +180,23 @@ export const usePageForm = ({
         setStatus("error");
       }
     },
-    [form, pageImageUrl, preview, setStatus]
+    [form, pageImageUrl, setStatus]
   );
+
+  useEffect(() => {
+    if (!isOwner) return;
+    if (!form.formState.isDirty || form.formState.isSubmitting) return;
+    const timer = setTimeout(() => {
+      form.handleSubmit(onSubmit)();
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [
+    form,
+    form.formState.isDirty,
+    form.formState.isSubmitting,
+    isOwner,
+    onSubmit,
+  ]);
 
   return { form, preview, isOwner, onSubmit };
 };

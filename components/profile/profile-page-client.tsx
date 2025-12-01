@@ -9,10 +9,17 @@ import { ProfileForm } from "@/components/profile/profile-form";
 import { ProfileBlocksClient } from "@/components/profile/profile-blocks-client";
 import type { ProfileBffPayload } from "@/types/profile";
 
-type ProfilePageClientProps = {
-  page: ProfileBffPayload["page"];
-  blocks: ProfileBffPayload["blocks"];
-  isOwner: boolean;
+type ProfilePageClientProps = ProfileBffPayload;
+
+const StatusSection = () => {
+  const { status } = useSaveStatus();
+  return (
+    <div className="fixed bottom-0 z-10 flex w-full justify-center bg-background">
+      <div className="border p-1 px-2 rounded-md min-w-24 text-center shadow-sm">
+        <StatusBadge status={status} />
+      </div>
+    </div>
+  );
 };
 
 export const ProfilePageClient = ({
@@ -20,15 +27,9 @@ export const ProfilePageClient = ({
   blocks,
   isOwner,
 }: ProfilePageClientProps) => {
-  
-  const StatusSection = () => {
-    const { status } = useSaveStatus();
-    return <StatusBadge status={status} />;
-  };
-
   return (
     <SaveStatusProvider>
-      <div className="space-y-6">
+      <main className="space-y-6">
         <StatusSection />
         <ProfileForm
           pageId={page.id}
@@ -44,7 +45,7 @@ export const ProfilePageClient = ({
           pageId={page.id}
           isOwner={isOwner}
         />
-      </div>
+      </main>
     </SaveStatusProvider>
   );
 };

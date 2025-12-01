@@ -43,11 +43,16 @@ const fetchProfileFromBff = async (
 export default async function ProfilePage({ params }: ProfilePageProps) {
   const { handle } = await params;
   const result = await fetchProfileFromBff(decodeURIComponent(handle));
+
   if (!result) {
     notFound();
   }
 
   const { page, isOwner, blocks } = result;
 
-  return <ProfilePageClient page={page} blocks={blocks} isOwner={isOwner} />;
+  return (
+    <main className="min-h-dvh flex flex-col relative">
+      <ProfilePageClient page={page} blocks={blocks} isOwner={isOwner} />
+    </main>
+  );
 }

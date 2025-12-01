@@ -29,12 +29,6 @@ const toPageLinks = (pages: OwnerPages): PageLink[] =>
 export default async function Header() {
   const user = await currentUser();
 
-  const profileHref = buildProfilePath(
-    typeof user?.publicMetadata?.handle === "string"
-      ? user.publicMetadata.handle
-      : ""
-  );
-
   let pageLinks: PageLink[] = [];
 
   if (user?.id) {
@@ -47,6 +41,6 @@ export default async function Header() {
   }
 
   return (
-    <HeaderClient profileHref={profileHref} pageLinks={pageLinks} />
+    <HeaderClient pageLinks={pageLinks} />
   );
 }

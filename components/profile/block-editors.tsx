@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toastManager } from "@/components/ui/toast";
-import { useSaveStatus, type SaveStatus } from "@/components/profile/save-status-context";
+import { useSaveStatus } from "@/components/profile/save-status-context";
 
 type SaveResponse =
   | { status: "success"; blockId: string }

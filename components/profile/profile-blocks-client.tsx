@@ -3,47 +3,25 @@
 import { useCallback, useMemo, useState, useTransition } from "react";
 import type { BlockWithDetails } from "@/types/block";
 import type { BlockType } from "@/config/block-registry";
+import type {
+  PageHandle,
+  PageId,
+  ProfileOwnership,
+} from "@/types/profile";
 import { BlockRegistryPanel } from "@/components/layout/block-registry";
 import { PageBlocks } from "@/components/profile/page-blocks";
 import { toastManager } from "@/components/ui/toast";
 import { useSaveStatus } from "@/components/profile/save-status-context";
+import { requestCreateBlock } from "@/service/blocks/create-block";
 
 type BlockItem =
   | { kind: "persisted"; block: BlockWithDetails }
   | { kind: "placeholder"; id: string; type: BlockType };
 
-type ProfileBlocksClientProps = {
+type ProfileBlocksClientProps = ProfileOwnership & {
   initialBlocks: BlockWithDetails[];
-  handle: string;
-  pageId: string;
-  isOwner: boolean;
-};
-
-const requestCreateBlock = async (params: {
-  pageId: string;
-  handle: string;
-  type: BlockType;
-  data: Record<string, unknown>;
-}): Promise<
-  | { status: "success"; block: BlockWithDetails }
-  | { status: "error"; message: string }
-> => {
-  const response = await fetch("/api/profile/block", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
-  });
-
-  const body = await response.json().catch(() => ({}));
-
-  if (!response.ok || body.status === "error") {
-    return {
-      status: "error",
-      message: body?.message ?? body?.reason ?? "블록을 생성하지 못했습니다.",
-    };
-  }
-
-  return { status: "success", block: body.block as BlockWithDetails };
+  handle: PageHandle;
+  pageId: PageId;
 };
 
 export const ProfileBlocksClient = ({
