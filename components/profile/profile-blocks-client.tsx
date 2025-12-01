@@ -3,11 +3,7 @@
 import { useCallback, useMemo, useState, useTransition } from "react";
 import type { BlockWithDetails } from "@/types/block";
 import type { BlockType } from "@/config/block-registry";
-import type {
-  PageHandle,
-  PageId,
-  ProfileOwnership,
-} from "@/types/profile";
+import type { PageHandle, PageId, ProfileOwnership } from "@/types/profile";
 import { BlockRegistryPanel } from "@/components/layout/block-registry";
 import { PageBlocks } from "@/components/profile/page-blocks";
 import { toastManager } from "@/components/ui/toast";
@@ -112,7 +108,7 @@ export const ProfileBlocksClient = ({
   const visibleItems = useMemo(() => items, [items]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 flex flex-col items-center">
       {isOwner ? (
         <BlockRegistryPanel onSelectBlock={handleAddPlaceholder} />
       ) : null}

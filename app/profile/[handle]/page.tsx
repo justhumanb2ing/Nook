@@ -9,9 +9,8 @@ type ProfilePageProps = {
 
 type BffResponse = ProfileBffPayload;
 
-const buildApiUrl = async (handle: string): Promise<string> => {
-  const headerStore = await headers();
-  const host = headerStore.get("host");
+const buildApiUrl = (handle: string, headers: Headers): string => {
+  const host = headers.get("host");
   const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
   const encodedHandle = encodeURIComponent(handle);
 
@@ -25,8 +24,9 @@ const buildApiUrl = async (handle: string): Promise<string> => {
 const fetchProfileFromBff = async (
   handle: string
 ): Promise<BffResponse | null> => {
-  const apiUrl = await buildApiUrl(handle);
   const headerStore = await headers();
+  const apiUrl = buildApiUrl(handle, headerStore);
+
   const response = await fetch(apiUrl, {
     headers: {
       cookie: headerStore.get("cookie") ?? "",
@@ -51,7 +51,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   const { page, isOwner, blocks } = result;
 
   return (
-    <main className="min-h-dvh flex flex-col relative">
+    <main className="min-h-dvh flex flex-col relative max-w-7xl mx-auto px-4">
       <ProfilePageClient page={page} blocks={blocks} isOwner={isOwner} />
     </main>
   );

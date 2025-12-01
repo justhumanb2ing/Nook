@@ -40,6 +40,7 @@ export async function GET(
 ) {
   try {
     const { userId } = await auth();
+
     const { handle } = await params;
     const handleCandidates = buildHandleCandidates(handle);
     if (handleCandidates.length === 0) {
@@ -59,7 +60,7 @@ export async function GET(
       "get_blocks_with_details",
       { p_page_id: page.id }
     );
-
+    console.log("blocks", userId);
     if (blockError) throw blockError;
 
     return NextResponse.json(

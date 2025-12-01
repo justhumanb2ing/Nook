@@ -30,7 +30,7 @@ export const ProfilePageClient = ({
   return (
     <SaveStatusProvider>
       <main className="space-y-6">
-        <StatusSection />
+        {isOwner && <StatusSection />}
         <ProfileForm
           pageId={page.id}
           handle={page.handle}

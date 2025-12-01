@@ -6,7 +6,7 @@ export const createServerSupabaseClient = async (): Promise<SupabaseClient> => {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      accessToken: async () => (await auth()).getToken() ?? null,
+      accessToken: async () => (await auth()).getToken(),
     }
   );
 };

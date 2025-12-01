@@ -144,7 +144,7 @@ export const LinkBlockEditor = ({
         setStatus("saved");
 
         if (resetTimer.current) clearTimeout(resetTimer.current);
-        resetTimer.current = setTimeout(() => setStatus("idle"), 1500);
+        resetTimer.current = setTimeout(() => setStatus("idle"), 5000);
       } catch (error) {
         const description =
           error instanceof Error ? error.message : "잠시 후 다시 시도해 주세요.";

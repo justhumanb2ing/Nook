@@ -188,7 +188,7 @@ export const usePageForm = ({
     if (!form.formState.isDirty || form.formState.isSubmitting) return;
     const timer = setTimeout(() => {
       form.handleSubmit(onSubmit)();
-    }, 1200);
+    }, 5000);
     return () => clearTimeout(timer);
   }, [
     form,
