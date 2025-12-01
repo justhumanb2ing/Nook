@@ -49,23 +49,29 @@ export const useSaveStatus = (): SaveStatusContextValue => {
 };
 
 export const StatusBadge = ({ status }: { status: SaveStatus }) => {
-  const label = useMemo(() => {
+  const { label, indicatorClass } = useMemo(() => {
     switch (status) {
-      case "saving":
-        return "변경 중";
       case "saved":
-        return "변경 완료";
+        return { label: "변경 완료", indicatorClass: "bg-emerald-500" };
       case "dirty":
-        return "변경 중...";
+      case "saving":
+        return {
+          label: "변경 중...",
+          indicatorClass: "bg-blue-500 animate-pulse",
+        };
       case "error":
-        return "저장 실패";
+        return { label: "저장 실패", indicatorClass: "bg-red-500" };
       default:
-        return "변경 사항 없음";
+        return { label: "변경 사항 없음", indicatorClass: "bg-zinc-300" };
     }
   }, [status]);
 
   return (
-    <div className="text-xs text-muted-foreground" aria-live="polite">
+    <div
+      className="flex items-center gap-2 text-xs text-muted-foreground"
+      aria-live="polite"
+    >
+      <span aria-hidden className={`size-2 rounded-full ${indicatorClass}`} />
       {label}
     </div>
   );

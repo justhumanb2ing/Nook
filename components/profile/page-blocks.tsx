@@ -126,7 +126,7 @@ export const PageBlocks = ({
   }
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-3 w-full">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {sortedBlocks.map((item) => {
           const isPlaceholder = item.kind === "placeholder";

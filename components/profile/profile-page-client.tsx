@@ -14,8 +14,8 @@ type ProfilePageClientProps = ProfileBffPayload;
 const StatusSection = () => {
   const { status } = useSaveStatus();
   return (
-    <div className="fixed bottom-0 z-10 flex w-full justify-center bg-background">
-      <div className="border p-1 px-2 rounded-md min-w-24 text-center shadow-sm">
+    <div className="z-10 bg-background flex justify-end">
+      <div className="p-1 px-2 rounded-md min-w-24 text-center">
         <StatusBadge status={status} />
       </div>
     </div>
