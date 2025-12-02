@@ -1,9 +1,29 @@
 "use client";
 
-import { useMemo } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+import {
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import Image from "next/image";
 import Link from "next/link";
-import { Loader2, Trash2 } from "lucide-react";
+import { GripVertical, Loader2, Trash2 } from "lucide-react";
 import type { BlockWithDetails } from "@/types/block";
 import type { BlockType } from "@/config/block-registry";
 
@@ -22,11 +42,17 @@ import {
   TextBlockEditor,
 } from "@/components/profile/block-editors";
 import { useSaveStatus } from "@/components/profile/save-status-context";
+import { cn } from "@/lib/utils";
 
 type PlaceholderBlock = { kind: "placeholder"; id: string; type: BlockType };
 type PersistedBlock = { kind: "persisted"; block: BlockWithDetails };
 
 type BlockItem = PlaceholderBlock | PersistedBlock;
+
+type SortableRenderProps = Pick<
+  ReturnType<typeof useSortable>,
+  "attributes" | "listeners" | "setActivatorNodeRef" | "isDragging"
+>;
 
 type PageBlocksProps = {
   items: BlockItem[];
@@ -40,6 +66,8 @@ type PageBlocksProps = {
   onCancelPlaceholder: (placeholderId: string) => void;
   onDeleteBlock?: (blockId: BlockWithDetails["id"]) => void;
   deletingBlockIds?: Set<BlockWithDetails["id"]>;
+  onReorder?: (event: DragEndEvent) => void;
+  disableReorder?: boolean;
 };
 
 const extractLinkData = (
@@ -69,8 +97,18 @@ export const PageBlocks = ({
   onCancelPlaceholder,
   onDeleteBlock,
   deletingBlockIds,
+  onReorder,
+  disableReorder,
 }: PageBlocksProps) => {
   const { setStatus } = useSaveStatus();
+  const [isMounted, setIsMounted] = useState(false);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
+  );
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   const sortedBlocks = useMemo(
     () =>
       [...items].sort((a, b) => {
@@ -92,6 +130,172 @@ export const PageBlocks = ({
         return 0;
       }),
     [items]
+  );
+  const sortableBlocks = useMemo(
+    () => sortedBlocks.filter((item): item is PersistedBlock => item.kind === "persisted"),
+    [sortedBlocks]
+  );
+  const canSort = Boolean(
+    isMounted && isOwner && onReorder && sortableBlocks.length > 1
+  );
+
+  const renderBlockCard = (
+    item: BlockItem,
+    sortableProps?: SortableRenderProps
+  ) => {
+    const isPlaceholder = item.kind === "placeholder";
+    const block = item.kind === "persisted" ? item.block : undefined;
+    const type = item.kind === "persisted" ? item.block.type : item.type;
+    const blockId = block?.id;
+    const isDeleting = Boolean(blockId && deletingBlockIds?.has(blockId));
+    const dragHandle =
+      sortableProps && isOwner && blockId ? (
+        <button
+          type="button"
+          aria-label="블록 순서 변경"
+          ref={sortableProps.setActivatorNodeRef}
+          {...sortableProps.attributes}
+          {...sortableProps.listeners}
+          className="absolute left-2 top-2 inline-flex items-center justify-center rounded-full border bg-white/90 p-1 text-muted-foreground shadow-sm transition hover:text-primary"
+        >
+          <GripVertical className="size-4" aria-hidden />
+        </button>
+      ) : null;
+
+    return (
+      <div
+        className={cn(
+          "group relative rounded-lg border border-zinc-200 bg-white p-3 shadow-sm",
+          sortableProps?.isDragging ? "ring-2 ring-primary/40 shadow-lg" : ""
+        )}
+      >
+        {dragHandle}
+        {isOwner && blockId ? (
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="ghost"
+            className={`absolute right-2 top-2 rounded-full border bg-white/90 shadow-sm transition-opacity ${
+              isDeleting ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            }`}
+            aria-label="블록 삭제"
+            disabled={isDeleting}
+            onClick={() => onDeleteBlock?.(blockId)}
+          >
+            {isDeleting ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : (
+              <Trash2 className="size-4" aria-hidden />
+            )}
+          </Button>
+        ) : null}
+        <div className="mt-3 space-y-3">
+          {(() => {
+            switch (type) {
+              case "link":
+                return (
+                  <LinkBlockEditor
+                    mode={isPlaceholder ? "placeholder" : "persisted"}
+                    blockId={blockId}
+                    handle={handle}
+                    isOwner={isOwner}
+                    data={extractLinkData(block)}
+                    onSavePlaceholder={
+                      isPlaceholder
+                        ? (data) => {
+                            setStatus("dirty");
+                            onSavePlaceholder(item.id, "link", data);
+                          }
+                        : undefined
+                    }
+                    onCancelPlaceholder={
+                      isPlaceholder
+                        ? () => onCancelPlaceholder(item.id)
+                        : undefined
+                    }
+                  />
+                );
+              case "text":
+                return (
+                  <TextBlockEditor
+                    mode={isPlaceholder ? "placeholder" : "persisted"}
+                    blockId={blockId}
+                    handle={handle}
+                    isOwner={isOwner}
+                    data={extractTextData(block)}
+                    onSavePlaceholder={
+                      isPlaceholder
+                        ? (data) => {
+                            setStatus("dirty");
+                            onSavePlaceholder(item.id, "text", data);
+                          }
+                        : undefined
+                    }
+                    onCancelPlaceholder={
+                      isPlaceholder
+                        ? () => onCancelPlaceholder(item.id)
+                        : undefined
+                    }
+                  />
+                );
+              case "image":
+                return (
+                  <p className="text-xs text-muted-foreground">
+                    이미지 블록은 업로드 이후에 렌더링됩니다.
+                  </p>
+                );
+              case "video":
+                return (
+                  <p className="text-xs text-muted-foreground">
+                    비디오 블록은 업로드 이후에 렌더링됩니다.
+                  </p>
+                );
+              default:
+                return (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      해당 블록 타입에 대한 UI가 아직 준비되지 않았습니다.
+                    </p>
+                    {isPlaceholder ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onCancelPlaceholder(item.id)}
+                      >
+                        취소
+                      </Button>
+                    ) : null}
+                  </div>
+                );
+            }
+          })()}
+        </div>
+      </div>
+    );
+  };
+
+  const renderGrid = (withSortable: boolean) => (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {sortedBlocks.map((item) => {
+        if (withSortable && item.kind === "persisted") {
+          return (
+            <SortableBlockCard
+              key={item.block.id}
+              id={item.block.id}
+              disabled={disableReorder}
+            >
+              {(sortableProps) => renderBlockCard(item, sortableProps)}
+            </SortableBlockCard>
+          );
+        }
+
+        return (
+          <div key={item.kind === "persisted" ? item.block.id : item.id}>
+            {renderBlockCard(item)}
+          </div>
+        );
+      })}
+    </div>
   );
 
   if (!items.length) {
@@ -130,126 +334,55 @@ export const PageBlocks = ({
     );
   }
 
+  if (!canSort) {
+    return (
+      <section className="space-y-3 w-full">{renderGrid(false)}</section>
+    );
+  }
+
   return (
     <section className="space-y-3 w-full">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {sortedBlocks.map((item) => {
-          const isPlaceholder = item.kind === "placeholder";
-          const block = item.kind === "persisted" ? item.block : undefined;
-          const type = item.kind === "persisted" ? item.block.type : item.type;
-          const blockId = block?.id;
-          const isDeleting =
-            Boolean(blockId && deletingBlockIds?.has(blockId));
-
-          return (
-            <div
-              key={item.kind === "persisted" ? item.block.id : item.id}
-              className="group relative rounded-lg border border-zinc-200 p-3 shadow-sm"
-            >
-              {isOwner && blockId ? (
-                <Button
-                  type="button"
-                  size="icon-sm"
-                  variant="ghost"
-                  className={`absolute right-2 top-2 rounded-full border bg-white/90 shadow-sm transition-opacity ${
-                    isDeleting ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                  }`}
-                  aria-label="블록 삭제"
-                  disabled={isDeleting}
-                  onClick={() => onDeleteBlock?.(blockId)}
-                >
-                  {isDeleting ? (
-                    <Loader2 className="size-4 animate-spin" aria-hidden />
-                  ) : (
-                    <Trash2 className="size-4" aria-hidden />
-                  )}
-                </Button>
-              ) : null}
-              <div className="mt-3 space-y-3">
-                {(() => {
-                  switch (type) {
-                    case "link":
-                      return (
-                        <LinkBlockEditor
-                          mode={isPlaceholder ? "placeholder" : "persisted"}
-                          blockId={blockId}
-                          handle={handle}
-                          isOwner={isOwner}
-                          data={extractLinkData(block)}
-                          onSavePlaceholder={
-                            isPlaceholder
-                              ? (data) => {
-                                  setStatus("dirty");
-                                  onSavePlaceholder(item.id, "link", data);
-                                }
-                              : undefined
-                          }
-                          onCancelPlaceholder={
-                            isPlaceholder
-                              ? () => onCancelPlaceholder(item.id)
-                              : undefined
-                          }
-                        />
-                      );
-                    case "text":
-                      return (
-                        <TextBlockEditor
-                          mode={isPlaceholder ? "placeholder" : "persisted"}
-                          blockId={blockId}
-                          handle={handle}
-                          isOwner={isOwner}
-                          data={extractTextData(block)}
-                          onSavePlaceholder={
-                            isPlaceholder
-                              ? (data) => {
-                                  setStatus("dirty");
-                                  onSavePlaceholder(item.id, "text", data);
-                                }
-                              : undefined
-                          }
-                          onCancelPlaceholder={
-                            isPlaceholder
-                              ? () => onCancelPlaceholder(item.id)
-                              : undefined
-                          }
-                        />
-                      );
-                    case "image":
-                      return (
-                        <p className="text-xs text-muted-foreground">
-                          이미지 블록은 업로드 이후에 렌더링됩니다.
-                        </p>
-                      );
-                    case "video":
-                      return (
-                        <p className="text-xs text-muted-foreground">
-                          비디오 블록은 업로드 이후에 렌더링됩니다.
-                        </p>
-                      );
-                    default:
-                      return (
-                        <div className="space-y-2">
-                          <p className="text-xs text-muted-foreground">
-                            해당 블록 타입에 대한 UI가 아직 준비되지 않았습니다.
-                          </p>
-                          {isPlaceholder ? (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => onCancelPlaceholder(item.id)}
-                            >
-                              취소
-                            </Button>
-                          ) : null}
-                        </div>
-                      );
-                  }
-                })()}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <DndContext sensors={sensors} onDragEnd={onReorder}>
+        <SortableContext
+          items={sortableBlocks.map((block) => block.block.id)}
+          strategy={rectSortingStrategy}
+        >
+          {renderGrid(true)}
+        </SortableContext>
+      </DndContext>
     </section>
+  );
+};
+
+type SortableBlockCardProps = {
+  id: string;
+  disabled?: boolean;
+  children: (props: SortableRenderProps) => ReactNode;
+};
+
+const SortableBlockCard = ({
+  id,
+  disabled,
+  children,
+}: SortableBlockCardProps) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, disabled });
+
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="h-full">
+      {children({ attributes, listeners, setActivatorNodeRef, isDragging })}
+    </div>
   );
 };

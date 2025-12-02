@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useMemo, useState, useTransition } from "react";
+import { useAuth } from "@clerk/nextjs";
+import type { DragEndEvent } from "@dnd-kit/core";
+import { arrayMove } from "@dnd-kit/sortable";
 import type { BlockWithDetails } from "@/types/block";
 import type { BlockType } from "@/config/block-registry";
 import type { PageHandle, PageId, ProfileOwnership } from "@/types/profile";
@@ -10,10 +13,22 @@ import { toastManager } from "@/components/ui/toast";
 import { useSaveStatus } from "@/components/profile/save-status-context";
 import { requestCreateBlock } from "@/service/blocks/create-block";
 import { requestDeleteBlock } from "@/service/blocks/delete-block";
+import { requestReorderBlocks } from "@/service/blocks/reorder-blocks";
+import { createBrowserSupabaseClient } from "@/config/supabase-browser";
 
 type BlockItem =
   | { kind: "persisted"; block: BlockWithDetails }
   | { kind: "placeholder"; id: string; type: BlockType };
+
+const isPersistedBlockItem = (
+  item: BlockItem
+): item is { kind: "persisted"; block: BlockWithDetails } =>
+  item.kind === "persisted";
+
+const isPlaceholderBlockItem = (
+  item: BlockItem
+): item is { kind: "placeholder"; id: string; type: BlockType } =>
+  item.kind === "placeholder";
 
 type ProfileBlocksClientProps = ProfileOwnership & {
   initialBlocks: BlockWithDetails[];
@@ -34,7 +49,13 @@ export const ProfileBlocksClient = ({
     () => new Set()
   );
   const [isPending, startTransition] = useTransition();
+  const [isReordering, setIsReordering] = useState(false);
+  const { getToken } = useAuth();
   const { setStatus } = useSaveStatus();
+  const supabase = useMemo(
+    () => createBrowserSupabaseClient(async () => await getToken()),
+    [getToken]
+  );
 
   const handleAddPlaceholder = useCallback(
     (type: BlockType) => {
@@ -112,6 +133,67 @@ export const ProfileBlocksClient = ({
     [deletingBlockIds, handle, isOwner, setStatus]
   );
 
+  const handleReorderBlocks = useCallback(
+    async ({ active, over }: DragEndEvent) => {
+      if (!isOwner || !over || active.id === over.id || isReordering) return;
+
+      const persistedItems = items.filter(isPersistedBlockItem);
+      const activeIndex = persistedItems.findIndex(
+        (item) => item.block.id === active.id
+      );
+      const overIndex = persistedItems.findIndex(
+        (item) => item.block.id === over.id
+      );
+
+      if (activeIndex === -1 || overIndex === -1) return;
+
+      const placeholderItems = items.filter(isPlaceholderBlockItem);
+      const previousItems = items;
+
+      const reorderedPersisted = arrayMove(
+        persistedItems,
+        activeIndex,
+        overIndex
+      ).map((item, ordering) => ({
+        kind: "persisted" as const,
+        block: { ...item.block, ordering },
+      }));
+
+      setItems([...reorderedPersisted, ...placeholderItems]);
+      setIsReordering(true);
+      setStatus("saving");
+
+      const payload = reorderedPersisted.map(({ block }) => ({
+        id: block.id,
+        ordering: block.ordering ?? 0,
+      }));
+
+      try {
+        const result = await requestReorderBlocks({
+          supabase,
+          pageId,
+          blocks: payload,
+        });
+
+        if (result.status === "error") {
+          setItems(previousItems);
+          setStatus("error");
+          toastManager.add({
+            title: "순서 변경 실패",
+            description: result.message,
+            type: "error",
+          });
+          return;
+        }
+
+        setStatus("saved");
+      } finally {
+        setIsReordering(false);
+      }
+    },
+    [isOwner, isReordering, items, pageId, setStatus, supabase]
+  );
+
   const handleSavePlaceholder = useCallback(
     (placeholderId: string, type: BlockType, data: Record<string, unknown>) => {
       if (!isOwner || isPending) return;
@@ -178,6 +260,8 @@ export const ProfileBlocksClient = ({
         onCancelPlaceholder={handleCancelPlaceholder}
         onDeleteBlock={handleDeleteBlock}
         deletingBlockIds={deletingBlockIds}
+        onReorder={handleReorderBlocks}
+        disableReorder={isReordering}
       />
     </div>
   );
