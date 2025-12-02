@@ -1,11 +1,9 @@
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import {
-  // fetchProfileByHandle,
-  prefetchProfileByHandle,
-} from "@/service/profile/profile-query-options";
-import { ProfilePageClient } from "@/components/profile/profile-page-client";
+import { prefetchProfileByHandle } from "@/service/profile/profile-query-options";
 import { HydrationBoundary } from "@tanstack/react-query";
+
+import ProfilePageClient from "@/components/profile/profile-page-client";
 
 type ProfilePageProps = {
   params: Promise<{ handle: string }>;
@@ -13,8 +11,8 @@ type ProfilePageProps = {
 
 export default async function ProfilePage({ params }: ProfilePageProps) {
   const { handle } = await params;
-  const decodedHandle = decodeURIComponent(handle);
   const headerStore = await headers();
+  const decodedHandle = decodeURIComponent(handle);
 
   const fetchParams = { handle: decodedHandle, headers: headerStore };
 
@@ -26,13 +24,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
   return (
     <HydrationBoundary state={dehydrated}>
-      <main className="min-h-dvh flex flex-col relative max-w-7xl mx-auto px-4">
-        <ProfilePageClient
-          page={data.page}
-          blocks={data.blocks}
-          isOwner={data.isOwner}
-        />
-      </main>
+      <ProfilePageClient fetchParams={fetchParams} />
     </HydrationBoundary>
   );
 }

@@ -1,6 +1,7 @@
 import { dehydrate, queryOptions } from "@tanstack/react-query";
 import { getQueryClient } from "@/lib/get-query-client";
 import { fetchProfileFromBff, type FetchProfileParams } from "./fetch-profile";
+import type { ProfileBffPayload } from "@/types/profile";
 
 const profileQueryKey = ["profile"] as const;
 
@@ -13,15 +14,18 @@ export const profileQueryOptions = {
   byHandle: (params: FetchProfileParams) =>
     queryOptions({
       queryKey: [...profileQueryKey, "bff", params.handle] as const,
-      queryFn: () => fetchProfileFromBff(params),
+      queryFn: () => fetchProfileFromBff(params) as Promise<ProfileBffPayload>,
     }),
 };
 
 export const prefetchProfileByHandle = async (params: FetchProfileParams) => {
   const queryClient = getQueryClient();
-  // await queryClient.prefetchQuery(profileQueryOptions.byHandle(params));
+  const data = await queryClient.fetchQuery({
+    ...profileQueryOptions.byHandle(params),
+  });
+
   return {
-    data: await queryClient.fetchQuery(profileQueryOptions.byHandle(params)),
+    data,
     dehydrated: dehydrate(queryClient),
   };
 };

@@ -1,15 +1,18 @@
 "use client";
 
+import { profileQueryOptions } from "@/service/profile/profile-query-options";
+import { QueryErrorResetBoundary } from "@tanstack/react-query";
+import { ErrorBoundary, Suspense } from "@suspensive/react";
+import { SuspenseQuery } from "@suspensive/react-query";
 import {
   SaveStatusProvider,
   StatusBadge,
   useSaveStatus,
-} from "@/components/profile/save-status-context";
-import { ProfileForm } from "@/components/profile/profile-form";
-import { ProfileBlocksClient } from "@/components/profile/profile-blocks-client";
-import type { ProfileBffPayload } from "@/types/profile";
+} from "./save-status-context";
+import { ProfileForm } from "./profile-form";
+import { ProfileBlocksClient } from "./profile-blocks-client";
 
-type ProfilePageClientProps = ProfileBffPayload;
+import type { FetchProfileParams } from "@/service/profile/fetch-profile";
 
 const StatusSection = () => {
   const { status } = useSaveStatus();
@@ -22,31 +25,45 @@ const StatusSection = () => {
   );
 };
 
-export const ProfilePageClient = ({
-  page,
-  blocks,
-  isOwner,
-}: ProfilePageClientProps) => {
+export default function ProfilePageClient({
+  fetchParams,
+}: {
+  fetchParams: FetchProfileParams;
+}) {
   return (
-    <SaveStatusProvider>
-      <main className="space-y-6">
-        {isOwner && <StatusSection />}
-        <ProfileForm
-          pageId={page.id}
-          handle={page.handle}
-          ownerId={page.owner_id}
-          isOwner={isOwner}
-          pageTitle={page.title ?? undefined}
-          pageDescription={page.description ?? undefined}
-          pageImageUrl={page.image_url ?? undefined}
-        />
-        <ProfileBlocksClient
-          initialBlocks={blocks}
-          handle={page.handle}
-          pageId={page.id}
-          isOwner={isOwner}
-        />
-      </main>
-    </SaveStatusProvider>
+    <main className="min-h-dvh flex flex-col relative max-w-7xl mx-auto px-4">
+      <QueryErrorResetBoundary>
+        {({ reset }) => (
+          <ErrorBoundary onReset={reset} fallback={<div>Error</div>}>
+            <Suspense fallback={<div>Loading</div>}>
+              <SuspenseQuery {...profileQueryOptions.byHandle(fetchParams)}>
+                {({ data: { isOwner, page, blocks } }) => (
+                  <SaveStatusProvider>
+                    <main className="space-y-6">
+                      {isOwner && <StatusSection />}
+                      <ProfileForm
+                        pageId={page.id}
+                        handle={page.handle}
+                        ownerId={page.owner_id}
+                        isOwner={isOwner}
+                        pageTitle={page.title ?? undefined}
+                        pageDescription={page.description ?? undefined}
+                        pageImageUrl={page.image_url ?? undefined}
+                      />
+                      <ProfileBlocksClient
+                        initialBlocks={blocks}
+                        handle={page.handle}
+                        pageId={page.id}
+                        isOwner={isOwner}
+                      />
+                    </main>
+                  </SaveStatusProvider>
+                )}
+              </SuspenseQuery>
+            </Suspense>
+          </ErrorBoundary>
+        )}
+      </QueryErrorResetBoundary>
+    </main>
   );
-};
+}

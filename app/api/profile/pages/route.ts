@@ -1,7 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import * as Sentry from "@sentry/nextjs";
-import { z } from "zod";
 import { createServerSupabaseClient } from "@/config/supabase";
 import type { Tables } from "@/types/database.types";
 
@@ -9,13 +8,10 @@ type OwnerPages = Array<
   Pick<Tables<"pages">, "id" | "handle" | "title" | "ordering">
 >;
 
-const requestSchema = z.object({
-  ownerId: z.string().min(1),
-});
-
-export const POST = async (req: Request) => {
+export async function GET(_req: NextRequest) {
   try {
     const { userId } = await auth();
+
     if (!userId) {
       return NextResponse.json(
         {
@@ -27,19 +23,8 @@ export const POST = async (req: Request) => {
       );
     }
 
-    const parsed = requestSchema.safeParse(await req.json());
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          status: "error",
-          reason: "INVALID_PAYLOAD",
-          message: "잘못된 요청입니다.",
-        },
-        { status: 400 }
-      );
-    }
+    const ownerId = _req.nextUrl.searchParams.get("ownerId");
 
-    const { ownerId } = parsed.data;
     if (ownerId !== userId) {
       return NextResponse.json(
         {
@@ -78,4 +63,4 @@ export const POST = async (req: Request) => {
       { status: 500 }
     );
   }
-};
+}

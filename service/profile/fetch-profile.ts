@@ -32,7 +32,7 @@ export const fetchProfileFromBff = async (
           if (response.status === 404) return null;
           throw new Error(`Profile BFF fetch failed: ${response.status}`);
         }
-
+        
         return (await response.json()) as ProfileBffPayload;
       }
     );

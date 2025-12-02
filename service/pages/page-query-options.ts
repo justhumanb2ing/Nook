@@ -1,4 +1,5 @@
 import {
+  dehydrate,
   mutationOptions,
   queryOptions,
   type QueryClient,
@@ -26,10 +27,14 @@ type UpdateOptions = {
  */
 export const pageQueryOptions = {
   all: pageQueryKey,
-  byOwner: (ownerId: string) =>
+  byOwner: (ownerId: string | null | undefined, headers?: HeadersInit) =>
     queryOptions({
-      queryKey: [...pageQueryKey, "owner", ownerId] as const,
-      queryFn: () => fetchPagesByOwnerId(ownerId),
+      queryKey: [...pageQueryKey, "owner", ownerId ?? ""] as const,
+      queryFn: () =>
+        !!ownerId
+          ? fetchPagesByOwnerId({ ownerId, headers })
+          : Promise.resolve([]),
+      enabled: !!ownerId,
     }),
   update: (options?: UpdateOptions) =>
     mutationOptions({
@@ -50,7 +55,8 @@ export const pageQueryOptions = {
 
         if (variables.handle) {
           await queryClient.cancelQueries({
-            queryKey: profileQueryOptions.byHandle({ handle: variables.handle }).queryKey,
+            queryKey: profileQueryOptions.byHandle({ handle: variables.handle })
+              .queryKey,
           });
         }
 
@@ -70,7 +76,8 @@ export const pageQueryOptions = {
 
         if (context?.handle) {
           void queryClient.invalidateQueries({
-            queryKey: profileQueryOptions.byHandle({ handle: context.handle }).queryKey,
+            queryKey: profileQueryOptions.byHandle({ handle: context.handle })
+              .queryKey,
           });
         }
       },
@@ -87,9 +94,22 @@ export const pageQueryOptions = {
 
         if (targetHandle) {
           void queryClient.invalidateQueries({
-            queryKey: profileQueryOptions.byHandle({ handle: targetHandle }).queryKey,
+            queryKey: profileQueryOptions.byHandle({ handle: targetHandle })
+              .queryKey,
           });
         }
       },
     }),
+};
+
+export const prefetchPageListByOwner = (
+  ownerId: string,
+  headers?: HeadersInit
+) => {
+  const queryClient = getQueryClient();
+  queryClient.fetchQuery({
+    ...pageQueryOptions.byOwner(ownerId, headers),
+  });
+
+  return { dehydrated: dehydrate(queryClient) };
 };

@@ -9,36 +9,30 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import { Item } from "@/components/ui/item";
+import {
+  QueryErrorResetBoundary,
+} from "@tanstack/react-query";
+import { pageQueryOptions } from "@/service/pages/page-query-options";
+import { ErrorBoundary, Suspense } from "@suspensive/react";
+import { SuspenseQuery } from "@suspensive/react-query";
 
-type HeaderClientProps = {
-  pageLinks: Array<{ id: string; href: string; label: string }>;
+type WithRequestHeaders = {
+  headers?: HeadersInit;
 };
 
-const PageLinks = ({
-  pageLinks,
-}: {
-  pageLinks: HeaderClientProps["pageLinks"];
-}) =>
-  pageLinks.length > 0 ? (
-    <Item
-      asChild
-      className="flex flex-wrap items-center gap-2 p-0 border-none bg-transparent shadow-none"
-    >
-      <nav>
-        {pageLinks.map((page) => (
-          <Link
-            key={page.id}
-            href={page.href}
-            className="px-3 py-1 text-sm text-zinc-900 transition hover:bg-zinc-100"
-          >
-            {page.label}
-          </Link>
-        ))}
-      </nav>
-    </Item>
-  ) : null;
+type HeaderClientProps = {
+  userId: string | null;
+} & WithRequestHeaders;
 
-export default function HeaderClient({ pageLinks }: HeaderClientProps) {
+const normalizeHandle = (rawHandle: string): string =>
+  rawHandle.trim().replace(/^@+/, "");
+
+const buildProfilePath = (handle: string): string => {
+  const normalized = normalizeHandle(handle);
+  return normalized ? `/profile/@${normalized}` : "/profile";
+};
+
+export default function HeaderClient({ userId, headers }: HeaderClientProps) {
   return (
     <Item
       asChild
@@ -55,7 +49,38 @@ export default function HeaderClient({ pageLinks }: HeaderClientProps) {
         </SignedOut>
         <SignedIn>
           <div className="flex items-center gap-3">
-            <PageLinks pageLinks={pageLinks} />
+            <QueryErrorResetBoundary>
+              {({ reset }) => (
+                <ErrorBoundary onReset={reset} fallback={<div>Error</div>}>
+                  <Suspense fallback={<div>Loading</div>}>
+                    <SuspenseQuery
+                      {...pageQueryOptions.byOwner(userId, headers)}
+                      select={(pages) => {
+                        return pages.map((page) => {
+                          const href = buildProfilePath(page.handle);
+                          const label = page.title?.trim() || page.handle;
+
+                          return { id: page.id, href, label };
+                        });
+                      }}
+                    >
+                      {({ data: pageLinks }) =>
+                        pageLinks.map((page) => (
+                          <Link
+                            key={page.id}
+                            href={page.href}
+                            className="px-3 py-1 text-sm text-zinc-900 transition hover:bg-zinc-100"
+                          >
+                            {page.label}
+                          </Link>
+                        ))
+                      }
+                    </SuspenseQuery>
+                  </Suspense>
+                </ErrorBoundary>
+              )}
+            </QueryErrorResetBoundary>
+
             <UserButton />
           </div>
         </SignedIn>

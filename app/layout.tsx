@@ -56,14 +56,16 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
-          <Header />
+          <Providers>
+            <Header />
+            {children}
+          </Providers>
           {hasGaMeasurementId ? (
             <>
               <GoogleAnalytics gaId={GA_MEASUREMENT_ID} />
               <GoogleTagManager gtmId={GA_MEASUREMENT_ID} />
             </>
           ) : null}
-          <Providers>{children}</Providers>
         </body>
       </html>
     </ClerkProvider>
