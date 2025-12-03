@@ -1,4 +1,4 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import * as Sentry from "@sentry/nextjs";
 import { prefetchPageListByOwner } from "@/service/pages/page-query-options";
 import HeaderClient from "./header-client";
@@ -6,17 +6,20 @@ import { HydrationBoundary } from "@tanstack/react-query";
 import { headers } from "next/headers";
 
 export default async function Header() {
-  const user = await currentUser();
+  const { userId, sessionClaims } = await auth();
   const headerStore = await headers();
   const cookie = headerStore.get("cookie") ?? undefined;
   const forwardedHeaders = cookie ? { cookie } : undefined;
+  const isOnboardingComplete =
+    sessionClaims?.metadata?.onboardingComplete === true;
+  const shouldPrefetchPages = Boolean(userId && isOnboardingComplete);
 
   let dehydrated;
 
-  if (user?.id) {
+  if (shouldPrefetchPages) {
     try {
       dehydrated = prefetchPageListByOwner(
-        user.id,
+        userId!,
         forwardedHeaders
       ).dehydrated;
     } catch (error) {
@@ -26,7 +29,11 @@ export default async function Header() {
 
   return (
     <HydrationBoundary state={dehydrated}>
-      <HeaderClient userId={user?.id ?? null} headers={forwardedHeaders} />
+      <HeaderClient
+        userId={userId ?? null}
+        headers={forwardedHeaders}
+        canLoadPages={shouldPrefetchPages}
+      />
     </HydrationBoundary>
   );
 }

@@ -22,6 +22,7 @@ type WithRequestHeaders = {
 
 type HeaderClientProps = {
   userId: string | null;
+  canLoadPages: boolean;
 } & WithRequestHeaders;
 
 const normalizeHandle = (rawHandle: string): string =>
@@ -32,7 +33,11 @@ const buildProfilePath = (handle: string): string => {
   return normalized ? `/profile/@${normalized}` : "/profile";
 };
 
-export default function HeaderClient({ userId, headers }: HeaderClientProps) {
+export default function HeaderClient({
+  userId,
+  headers,
+  canLoadPages,
+}: HeaderClientProps) {
   return (
     <Item
       asChild
@@ -49,37 +54,39 @@ export default function HeaderClient({ userId, headers }: HeaderClientProps) {
         </SignedOut>
         <SignedIn>
           <div className="flex items-center gap-3">
-            <QueryErrorResetBoundary>
-              {({ reset }) => (
-                <ErrorBoundary onReset={reset} fallback={<div>Error</div>}>
-                  <Suspense fallback={<div>Loading</div>}>
-                    <SuspenseQuery
-                      {...pageQueryOptions.byOwner(userId, headers)}
-                      select={(pages) => {
-                        return pages.map((page) => {
-                          const href = buildProfilePath(page.handle);
-                          const label = page.title?.trim() || page.handle;
+            {canLoadPages && userId ? (
+              <QueryErrorResetBoundary>
+                {({ reset }) => (
+                  <ErrorBoundary onReset={reset} fallback={<div>Error</div>}>
+                    <Suspense fallback={<div>Loading</div>}>
+                      <SuspenseQuery
+                        {...pageQueryOptions.byOwner(userId, headers)}
+                        select={(pages) => {
+                          return pages.map((page) => {
+                            const href = buildProfilePath(page.handle);
+                            const label = page.title?.trim() || page.handle;
 
-                          return { id: page.id, href, label };
-                        });
-                      }}
-                    >
-                      {({ data: pageLinks }) =>
-                        pageLinks.map((page) => (
-                          <Link
-                            key={page.id}
-                            href={page.href}
-                            className="px-3 py-1 text-sm text-zinc-900 transition hover:bg-zinc-100"
-                          >
-                            {page.label}
-                          </Link>
-                        ))
-                      }
-                    </SuspenseQuery>
-                  </Suspense>
-                </ErrorBoundary>
-              )}
-            </QueryErrorResetBoundary>
+                            return { id: page.id, href, label };
+                          });
+                        }}
+                      >
+                        {({ data: pageLinks }) =>
+                          pageLinks.map((page) => (
+                            <Link
+                              key={page.id}
+                              href={page.href}
+                              className="px-3 py-1 text-sm text-zinc-900 transition hover:bg-zinc-100"
+                            >
+                              {page.label}
+                            </Link>
+                          ))
+                        }
+                      </SuspenseQuery>
+                    </Suspense>
+                  </ErrorBoundary>
+                )}
+              </QueryErrorResetBoundary>
+            ) : null}
 
             <UserButton />
           </div>
