@@ -40,7 +40,7 @@ export async function GET(
 ) {
   try {
     const { userId } = await auth();
-    
+
     const { handle } = await params;
     const handleCandidates = buildHandleCandidates(handle);
     if (handleCandidates.length === 0) {
@@ -60,7 +60,7 @@ export async function GET(
       "get_blocks_with_details",
       { p_page_id: page.id }
     );
-    
+
     if (blockError) throw blockError;
 
     return NextResponse.json(
@@ -80,16 +80,4 @@ export async function GET(
       { status: 500 }
     );
   }
-}
-
-export async function OPTIONS() {
-  return NextResponse.json(
-    { methods: ["GET", "OPTIONS"] },
-    {
-      status: 204,
-      headers: {
-        Allow: "GET, OPTIONS",
-      },
-    }
-  );
 }
