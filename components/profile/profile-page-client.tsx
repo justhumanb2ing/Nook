@@ -15,6 +15,8 @@ import { HandleChangeForm } from "./handle-change-form";
 
 import type { FetchProfileParams } from "@/service/profile/fetch-profile";
 
+import { SettingDropdownMenu } from "./setting-dropdownmenu";
+
 const StatusSection = () => {
   const { status } = useSaveStatus();
   return (
@@ -40,7 +42,7 @@ export default function ProfilePageClient({
               <SuspenseQuery {...profileQueryOptions.byHandle(fetchParams)}>
                 {({ data: { isOwner, page, blocks } }) => (
                   <SaveStatusProvider>
-                    <main className="space-y-6">
+                    <main className="space-y-6 grow">
                       {isOwner && <StatusSection />}
                       {isOwner ? (
                         <HandleChangeForm
@@ -73,6 +75,9 @@ export default function ProfilePageClient({
           </ErrorBoundary>
         )}
       </QueryErrorResetBoundary>
+      <aside className="sticky bottom-5 left-0 bg-background w-fit">
+        <SettingDropdownMenu />
+      </aside>
     </main>
   );
 }
