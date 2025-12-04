@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-asserted-optional-chain */
 import { notFound } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { prefetchProfileByHandle } from "@/service/profile/profile-query-options";
@@ -8,6 +9,7 @@ import ProfilePageClient from "@/components/profile/profile-page-client";
 
 import type { Metadata, ResolvingMetadata } from "next";
 import { fetchProfile } from "@/service/profile/fetch-profile";
+import { siteConfig } from "@/config/metadata-config";
 
 type ProfilePageProps = {
   params: Promise<{ handle: string }>;
@@ -23,21 +25,25 @@ export async function generateMetadata(
   // Fetch Page information
   const data = await fetchProfile({ supabase, handle, userId: null });
 
-  const title =
-    data?.page.title ??
-    (handle ? `@${handle.replace(/^@+/, "")} | Nook` : "Profile | Nook");
-  const description =
-    data?.page.description ??
-    "See this Nook profile with links, blocks, and more.";
+  const title = data?.page.title!;
+  const description = data?.page.description ?? `${title}'s profile`;
   const imageUrl = data?.page.image_url ?? undefined;
 
   return {
     title,
     description,
+    alternates: {
+      canonical: `${siteConfig.url}/profile/@${handle}`,
+      languages: {
+        "ko-KR": `${siteConfig.url}/profile/@${handle}`,
+        "en-US": `${siteConfig.url}/profile/@${handle}`,
+      },
+    },
     openGraph: {
       title,
       description,
       images: imageUrl ? [{ url: imageUrl }] : undefined,
+      url: `${siteConfig.url}/profile/@${handle}`,
     },
     twitter: {
       card: "summary_large_image",
