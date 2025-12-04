@@ -50,7 +50,7 @@ export default function HeaderClient({ userId }: HeaderClientProps) {
   return (
     <Item
       asChild
-      className="flex justify-end items-center p-4 gap-4 h-16 border-none bg-transparent shadow-none"
+      className="fixed w-full top-0 flex justify-end items-center p-4 gap-4 h-16 border-none shadow-none bg-background/50 backdrop-blur-sm"
     >
       <header>
         <SignedOut>
@@ -74,7 +74,7 @@ export default function HeaderClient({ userId }: HeaderClientProps) {
                         select={(pages) =>
                           pages.map((page) => {
                             const href = buildProfilePath(page.handle);
-                            const label = page.handle
+                            const label = page.handle;
 
                             return { id: page.id, href, label };
                           })
