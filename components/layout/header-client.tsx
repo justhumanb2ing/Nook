@@ -8,6 +8,7 @@ import {
   SignedOut,
   UserButton,
   useAuth,
+  useUser,
 } from "@clerk/nextjs";
 import { useMemo } from "react";
 import { QueryErrorResetBoundary } from "@tanstack/react-query";
@@ -20,7 +21,6 @@ import { pageQueryOptions } from "@/service/pages/page-query-options";
 
 type HeaderClientProps = {
   userId: string | null;
-  canLoadPages: boolean;
 };
 
 const normalizeHandle = (rawHandle: string): string =>
@@ -31,15 +31,21 @@ const buildProfilePath = (handle: string): string => {
   return normalized ? `/profile/@${normalized}` : "/profile";
 };
 
-export default function HeaderClient({
-  userId,
-  canLoadPages,
-}: HeaderClientProps) {
+export default function HeaderClient({ userId }: HeaderClientProps) {
   const { getToken } = useAuth();
+  const { user } = useUser();
   const supabase: SupabaseClient = useMemo(
     () => createBrowserSupabaseClient(() => getToken()),
     [getToken]
   );
+
+  // 클라이언트에서 onboardingComplete를 확인
+  // user.publicMetadata는 user.reload() 호출 시 즉시 업데이트되므로
+  // 온보딩 완료 직후 새로고침 없이도 즉시 반영됨 (UX)
+  // 서버의 sessionClaims와 달리 실시간으로 반영되므로 렌더링 결정에 사용
+  // 온보딩 미완료 사용자는 핸들 목록을 페칭/표시하지 않음
+  const isOnboardingComplete =
+    user?.publicMetadata?.onboardingComplete === true && !!userId;
 
   return (
     <Item
@@ -57,7 +63,8 @@ export default function HeaderClient({
         </SignedOut>
         <SignedIn>
           <div className="flex items-center gap-3">
-            {canLoadPages && userId ? (
+            {/* 온보딩 완료된 사용자만 핸들 목록 표시 */}
+            {isOnboardingComplete && userId ? (
               <QueryErrorResetBoundary>
                 {({ reset }) => (
                   <ErrorBoundary onReset={reset} fallback={<div>Error</div>}>

@@ -52,11 +52,14 @@ export const completeOnboarding = async (formData: FormData) => {
 
   // Update Clerk metadata: onboarding complete only
   const client = await clerkClient();
+
   await client.users.updateUser(userId, {
     publicMetadata: {
       onboardingComplete: true,
     },
   });
 
+  // Note: 쿼리 무효화는 클라이언트 컴포넌트에서 처리해야 합니다.
+  // 서버 액션에서 무효화하면 서버 QueryClient만 무효화되어 클라이언트 쿼리에 반영되지 않습니다.
   return { message: "Onboarding complete", handle: storedHandle };
 };
