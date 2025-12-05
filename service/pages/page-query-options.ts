@@ -70,6 +70,7 @@ const invalidateProfileByHandleVariants = (
 
     queryClient.invalidateQueries({
       queryKey: profileQueryOptions.byHandleKey(candidate),
+      refetchType: "none",
     });
   });
 };
@@ -206,16 +207,27 @@ export const pageQueryOptions = {
           });
         }
 
-        invalidateProfileByHandleVariants(variables.currentHandle, queryClient);
-
         return {
           ownerId: variables.ownerId,
           currentHandle: variables.currentHandle,
           nextHandle: variables.nextHandle,
         };
       },
-      onSuccess: (data, variables, result) => {
-        window.location.replace(`/profile/@${result.nextHandle}`);
+      onSuccess: async (_data, variables, context) => {
+        const queryClient = resolveQueryClient(options.queryClient);
+        const nextHandle = variables.nextHandle ?? context?.nextHandle;
+
+        if (nextHandle) {
+          await queryClient.prefetchQuery({
+            ...profileQueryOptions.byHandle({
+              supabase: options.supabase,
+              handle: nextHandle,
+              userId: options.userId,
+            }),
+          });
+
+          window.location.replace(`/profile/@${nextHandle}`);
+        }
       },
       onError: async (_error, _variables, context) => {
         const queryClient = resolveQueryClient(options.queryClient);
@@ -245,11 +257,6 @@ export const pageQueryOptions = {
             ).queryKey,
           });
         }
-
-        invalidateProfileByHandleVariants(
-          context?.currentHandle ?? options.handle,
-          queryClient
-        );
       },
     }),
   toggleVisibility: (options: ToggleVisibilityOptions) =>
