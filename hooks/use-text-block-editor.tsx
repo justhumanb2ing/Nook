@@ -21,19 +21,31 @@ export const useTextBlockEditor = (params: TextBlockEditorParams) => {
     [values.content]
   );
 
-  const save = async (v: TextBlockState) => {
+  const save = (v: TextBlockState) => {
     if (params.mode === "placeholder" && params.onSavePlaceholder) {
-      return params.onSavePlaceholder(v);
+      params.onSavePlaceholder(v);
+      return Promise.resolve();
     }
 
-    if (params.mode === "persisted" && params.blockId) {
-      await updateBlockMutation.mutateAsync({
-        type: "text",
-        blockId: params.blockId,
-        handle: params.handle,
-        content: v.content,
+    const blockId = params.blockId;
+    if (params.mode === "persisted" && blockId) {
+      return new Promise<void>((resolve, reject) => {
+        updateBlockMutation.mutate(
+          {
+            type: "text",
+            blockId,
+            handle: params.handle,
+            content: v.content,
+          },
+          {
+            onSuccess: () => resolve(),
+            onError: (error) => reject(error),
+          }
+        );
       });
     }
+
+    return Promise.resolve();
   };
 
   useDebouncedMutation<TextBlockState>({

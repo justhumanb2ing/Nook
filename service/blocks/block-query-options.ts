@@ -1,42 +1,60 @@
 import { mutationOptions, type QueryClient } from "@tanstack/react-query";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { BlockWithDetails } from "@/types/block";
+import type { PageHandle, PageId, ProfileBffPayload } from "@/types/profile";
 import { getQueryClient } from "@/lib/get-query-client";
-import type { PageHandle, PageId } from "@/types/profile";
 import { profileQueryOptions } from "../profile/profile-query-options";
 import {
   requestCreateBlock,
   type CreateBlockParams,
-  type CreateBlockResult,
 } from "./create-block";
 import {
   requestDeleteBlock,
   type DeleteBlockParams,
-  type DeleteBlockResult,
 } from "./delete-block";
 import {
   requestReorderBlocks,
   type ReorderBlocksParams,
-  type ReorderBlocksResult,
 } from "./reorder-blocks";
 import {
   requestUpdateBlockContent,
   type UpdateBlockContentParams,
-  type UpdateBlockResponse,
 } from "./update-block-content";
+import {
+  applyContentPatch,
+  applyOrderingPatch,
+  createOptimisticBlock,
+  resequenceBlocks,
+} from "./block-normalizer";
 
 const blockQueryKey = ["block"] as const;
 const resolveQueryClient = (client?: QueryClient): QueryClient =>
   client ?? getQueryClient();
 
-const invalidateProfile = (
-  handle: PageHandle | undefined,
-  queryClient: QueryClient
-): void => {
-  if (!handle) return;
+type BlockMutationContext = {
+  handle?: PageHandle;
+  previous?: ProfileBffPayload;
+  optimisticBlockId?: string;
+};
 
-  void queryClient.invalidateQueries({
-    queryKey: profileQueryOptions.byHandleKey(handle),
-  });
+type MutationLifecycleCallbacks<TData, TVariables> = {
+  onMutate?: (variables: TVariables) => void;
+  onError?: (
+    error: Error,
+    variables: TVariables,
+    context: BlockMutationContext | undefined
+  ) => void;
+  onSuccess?: (
+    data: TData,
+    variables: TVariables,
+    context: BlockMutationContext | undefined
+  ) => void;
+  onSettled?: (
+    data: TData | undefined,
+    error: Error | null,
+    variables: TVariables,
+    context: BlockMutationContext | undefined
+  ) => void;
 };
 
 type BlockMutationOptionsArgs = {
@@ -56,18 +74,98 @@ type ReorderBlocksVariables = Omit<
 >;
 type UpdateBlockContentVariables = UpdateBlockContentParams;
 
+const resolveHandle = (
+  variablesHandle?: PageHandle,
+  optionHandle?: PageHandle
+): PageHandle | undefined => variablesHandle ?? optionHandle;
+
+const getProfileSnapshot = (
+  queryClient: QueryClient,
+  handle?: PageHandle
+): ProfileBffPayload | undefined =>
+  handle
+    ? queryClient.getQueryData<ProfileBffPayload>(
+        profileQueryOptions.byHandleKey(handle)
+      )
+    : undefined;
+
+const setProfileBlocks = (
+  queryClient: QueryClient,
+  handle: PageHandle | undefined,
+  updater: (blocks: BlockWithDetails[]) => BlockWithDetails[]
+) => {
+  if (!handle) return;
+
+  queryClient.setQueryData<ProfileBffPayload>(
+    profileQueryOptions.byHandleKey(handle),
+    (previous) => {
+      if (!previous) return previous;
+      return {
+        ...previous,
+        blocks: resequenceBlocks(updater(previous.blocks)),
+      };
+    }
+  );
+};
+
+const rollbackProfile = (
+  queryClient: QueryClient,
+  context: BlockMutationContext | undefined
+) => {
+  if (!context?.handle) return;
+  if (context.previous) {
+    queryClient.setQueryData(
+      profileQueryOptions.byHandleKey(context.handle),
+      context.previous
+    );
+    return;
+  }
+
+  void queryClient.invalidateQueries({
+    queryKey: profileQueryOptions.byHandleKey(context.handle),
+  });
+};
+
+const invalidateProfile = (
+  queryClient: QueryClient,
+  handle: PageHandle | undefined
+) => {
+  if (!handle) return;
+  void queryClient.invalidateQueries({
+    queryKey: profileQueryOptions.byHandleKey(handle),
+  });
+};
+
+const throwIfFailed = <
+  TResult extends { status: string; message?: string }
+>(
+  result: TResult
+): Extract<TResult, { status: "success" }> => {
+  if (result.status !== "success") {
+    throw new Error(result.message ?? "요청에 실패했습니다.");
+  }
+  return result as Extract<TResult, { status: "success" }>;
+};
+
 /**
  * Block 도메인의 mutation 옵션 모음.
- * - 생성/삭제/순서변경을 단일 키 아래에서 관리한다.
+ * - setQueryData를 기반으로 낙관적 업데이트를 수행한다.
  */
 export const blockQueryOptions = {
   all: blockQueryKey,
-  create: (options: BlockMutationOptionsArgs) =>
+  create: (
+    options: BlockMutationOptionsArgs & {
+      callbacks?: MutationLifecycleCallbacks<
+        BlockWithDetails,
+        CreateBlockVariables
+      >;
+    }
+  ) =>
     mutationOptions<
-      CreateBlockResult,
+      BlockWithDetails,
       Error,
       CreateBlockVariables,
-      { handle?: PageHandle }
+      BlockMutationContext
     >({
       mutationKey: [
         ...blockQueryKey,
@@ -75,15 +173,22 @@ export const blockQueryOptions = {
         options?.pageId ?? "global",
         options?.handle ?? "global",
       ] as const,
-      mutationFn: (variables: CreateBlockVariables) =>
-        requestCreateBlock({
+      mutationFn: async (variables) => {
+        const result = await requestCreateBlock({
           supabase: options.supabase,
           userId: options.userId,
           ...variables,
-        }),
+        });
+        const success = throwIfFailed(result);
+        if (!success.block) {
+          throw new Error("생성된 블록 데이터를 확인할 수 없습니다.");
+        }
+        return success.block;
+      },
       onMutate: async (variables) => {
+        options.callbacks?.onMutate?.(variables);
         const queryClient = resolveQueryClient(options?.queryClient);
-        const targetHandle = variables.handle ?? options?.handle;
+        const targetHandle = resolveHandle(variables.handle, options.handle);
         if (targetHandle) {
           await queryClient.cancelQueries({
             queryKey: profileQueryOptions.byHandleKey(targetHandle),
@@ -91,40 +196,77 @@ export const blockQueryOptions = {
           });
         }
 
+        const previous = getProfileSnapshot(queryClient, targetHandle);
+        if (previous) {
+          const optimisticBlock = createOptimisticBlock({
+            type: variables.type,
+            data: variables.data,
+            currentLength: previous.blocks.length,
+          });
+          setProfileBlocks(queryClient, targetHandle, (blocks) => [
+            ...blocks,
+            optimisticBlock,
+          ]);
+          return {
+            handle: targetHandle,
+            previous,
+            optimisticBlockId: optimisticBlock.id,
+          };
+        }
+
         return { handle: targetHandle };
       },
-      onError: async (_error, _variables, context) => {
+      onError: (error, variables, context) => {
         const queryClient = resolveQueryClient(options?.queryClient);
-        invalidateProfile(context?.handle, queryClient);
+        rollbackProfile(queryClient, context);
+        options.callbacks?.onError?.(error, variables, context);
       },
-      onSettled: async (_data, _error, variables, context) => {
+      onSuccess: (data, variables, context) => {
         const queryClient = resolveQueryClient(options?.queryClient);
-        const targetHandle = variables.handle ?? context?.handle ?? options?.handle;
-        invalidateProfile(targetHandle, queryClient);
+        if (context?.handle) {
+          setProfileBlocks(queryClient, context.handle, (blocks) => {
+            const replaced = context.optimisticBlockId
+              ? blocks.map((block) =>
+                  block.id === context.optimisticBlockId ? data : block
+                )
+              : [...blocks, data];
+            return replaced;
+          });
+        }
+        options.callbacks?.onSuccess?.(data, variables, context);
+      },
+      onSettled: (data, error, variables, context) => {
+        const queryClient = resolveQueryClient(options?.queryClient);
+        if ((error || !context?.previous) && context?.handle) {
+          invalidateProfile(queryClient, context.handle);
+        }
+        options.callbacks?.onSettled?.(data, error ?? null, variables, context);
       },
     }),
-  delete: (options: BlockMutationOptionsArgs) =>
-    mutationOptions<
-      DeleteBlockResult,
-      Error,
-      DeleteBlockVariables,
-      { handle?: PageHandle }
-    >({
+  delete: (
+    options: BlockMutationOptionsArgs & {
+      callbacks?: MutationLifecycleCallbacks<void, DeleteBlockVariables>;
+    }
+  ) =>
+    mutationOptions<void, Error, DeleteBlockVariables, BlockMutationContext>({
       mutationKey: [
         ...blockQueryKey,
         "delete",
         options?.blockId ?? "dynamic",
         options?.handle ?? "global",
       ] as const,
-      mutationFn: (variables: DeleteBlockVariables) =>
-        requestDeleteBlock({
+      mutationFn: async (variables) => {
+        const result = await requestDeleteBlock({
           supabase: options.supabase,
           userId: options.userId,
           ...variables,
-        }),
+        });
+        throwIfFailed(result);
+      },
       onMutate: async (variables) => {
+        options.callbacks?.onMutate?.(variables);
         const queryClient = resolveQueryClient(options?.queryClient);
-        const targetHandle = variables.handle ?? options?.handle;
+        const targetHandle = resolveHandle(variables.handle, options.handle);
 
         if (targetHandle) {
           await queryClient.cancelQueries({
@@ -133,40 +275,55 @@ export const blockQueryOptions = {
           });
         }
 
-        return { handle: targetHandle };
+        const previous = getProfileSnapshot(queryClient, targetHandle);
+        if (previous) {
+          setProfileBlocks(queryClient, targetHandle, (blocks) =>
+            blocks.filter((block) => block.id !== variables.blockId)
+          );
+        }
+
+        return { handle: targetHandle, previous };
       },
-      onError: async (_error, _variables, context) => {
+      onError: (error, variables, context) => {
         const queryClient = resolveQueryClient(options?.queryClient);
-        invalidateProfile(context?.handle, queryClient);
+        rollbackProfile(queryClient, context);
+        options.callbacks?.onError?.(error, variables, context);
       },
-      onSettled: async (_data, _error, variables, context) => {
+      onSuccess: (_data, variables, context) => {
+        options.callbacks?.onSuccess?.(undefined as void, variables, context);
+      },
+      onSettled: (_data, error, variables, context) => {
         const queryClient = resolveQueryClient(options?.queryClient);
-        const targetHandle = variables.handle ?? context?.handle ?? options?.handle;
-        invalidateProfile(targetHandle, queryClient);
+        if ((error || !context?.previous) && context?.handle) {
+          invalidateProfile(queryClient, context.handle);
+        }
+        options.callbacks?.onSettled?.(undefined, error ?? null, variables, context);
       },
     }),
-  reorder: (options: BlockMutationOptionsArgs) =>
-    mutationOptions<
-      ReorderBlocksResult,
-      Error,
-      ReorderBlocksVariables,
-      { handle?: PageHandle }
-    >({
+  reorder: (
+    options: BlockMutationOptionsArgs & {
+      callbacks?: MutationLifecycleCallbacks<void, ReorderBlocksVariables>;
+    }
+  ) =>
+    mutationOptions<void, Error, ReorderBlocksVariables, BlockMutationContext>({
       mutationKey: [
         ...blockQueryKey,
         "reorder",
         options?.pageId ?? "global",
         options?.handle ?? "global",
       ] as const,
-      mutationFn: (variables: ReorderBlocksVariables) =>
-        requestReorderBlocks({
+      mutationFn: async (variables) => {
+        const result = await requestReorderBlocks({
           supabase: options.supabase,
           userId: options.userId,
           ...variables,
-        }),
+        });
+        throwIfFailed(result);
+      },
       onMutate: async (variables) => {
+        options.callbacks?.onMutate?.(variables);
         const queryClient = resolveQueryClient(options?.queryClient);
-        const targetHandle = variables.handle ?? options?.handle;
+        const targetHandle = resolveHandle(variables.handle, options.handle);
 
         if (targetHandle) {
           await queryClient.cancelQueries({
@@ -175,24 +332,44 @@ export const blockQueryOptions = {
           });
         }
 
-        return { handle: targetHandle };
+        const previous = getProfileSnapshot(queryClient, targetHandle);
+        if (previous) {
+          setProfileBlocks(queryClient, targetHandle, (blocks) =>
+            applyOrderingPatch(blocks, variables.blocks)
+          );
+        }
+
+        return { handle: targetHandle, previous };
       },
-      onError: async (_error, _variables, context) => {
+      onError: (error, variables, context) => {
         const queryClient = resolveQueryClient(options?.queryClient);
-        invalidateProfile(context?.handle, queryClient);
+        rollbackProfile(queryClient, context);
+        options.callbacks?.onError?.(error, variables, context);
       },
-      onSettled: async (_data, _error, variables, context) => {
+      onSuccess: (_data, variables, context) => {
+        options.callbacks?.onSuccess?.(undefined as void, variables, context);
+      },
+      onSettled: (_data, error, variables, context) => {
         const queryClient = resolveQueryClient(options?.queryClient);
-        const targetHandle = variables.handle ?? context?.handle ?? options?.handle;
-        invalidateProfile(targetHandle, queryClient);
+        if ((error || !context?.previous) && context?.handle) {
+          invalidateProfile(queryClient, context.handle);
+        }
+        options.callbacks?.onSettled?.(undefined, error ?? null, variables, context);
       },
     }),
-  updateContent: (options: BlockMutationOptionsArgs) =>
+  updateContent: (
+    options: BlockMutationOptionsArgs & {
+      callbacks?: MutationLifecycleCallbacks<
+        UpdateBlockContentVariables,
+        UpdateBlockContentVariables
+      >;
+    }
+  ) =>
     mutationOptions<
-      UpdateBlockResponse,
+      UpdateBlockContentVariables,
       Error,
       UpdateBlockContentVariables,
-      { handle?: PageHandle }
+      BlockMutationContext
     >({
       mutationKey: [
         ...blockQueryKey,
@@ -204,15 +381,19 @@ export const blockQueryOptions = {
         shouldShowToast: true,
         toastKey: "updateContent",
       },
-      mutationFn: (variables: UpdateBlockContentVariables) =>
-        requestUpdateBlockContent({
+      mutationFn: async (variables) => {
+        const result = await requestUpdateBlockContent({
           ...variables,
           supabase: options.supabase,
           userId: options.userId,
-        }),
+        });
+        throwIfFailed(result);
+        return variables;
+      },
       onMutate: async (variables) => {
+        options.callbacks?.onMutate?.(variables);
         const queryClient = resolveQueryClient(options?.queryClient);
-        const targetHandle = variables.handle ?? options?.handle;
+        const targetHandle = resolveHandle(variables.handle, options.handle);
 
         if (targetHandle) {
           await queryClient.cancelQueries({
@@ -221,16 +402,29 @@ export const blockQueryOptions = {
           });
         }
 
-        return { handle: targetHandle };
+        const previous = getProfileSnapshot(queryClient, targetHandle);
+        if (previous) {
+          setProfileBlocks(queryClient, targetHandle, (blocks) =>
+            applyContentPatch(blocks, variables)
+          );
+        }
+
+        return { handle: targetHandle, previous };
       },
-      onError: async (_error, _variables, context) => {
+      onError: (error, variables, context) => {
         const queryClient = resolveQueryClient(options?.queryClient);
-        invalidateProfile(context?.handle, queryClient);
+        rollbackProfile(queryClient, context);
+        options.callbacks?.onError?.(error, variables, context);
       },
-      onSettled: async (_data, _error, variables, context) => {
+      onSuccess: (data, variables, context) => {
+        options.callbacks?.onSuccess?.(data, variables, context);
+      },
+      onSettled: (data, error, variables, context) => {
         const queryClient = resolveQueryClient(options?.queryClient);
-        const targetHandle = variables.handle ?? context?.handle ?? options?.handle;
-        invalidateProfile(targetHandle, queryClient);
+        if ((error || !context?.previous) && context?.handle) {
+          invalidateProfile(queryClient, context.handle);
+        }
+        options.callbacks?.onSettled?.(data, error ?? null, variables, context);
       },
     }),
 };

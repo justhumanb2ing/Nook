@@ -17,7 +17,7 @@ export const useLinkBlockEditor = (params: LinkBlockEditorParams) => {
   const updateBlockMutation = useMutation(
     blockQueryOptions.updateContent({ supabase, userId })
   );
-  
+
   const getValues = useMemo(
     () => () => ({
       url: values.url.trim(),
@@ -26,20 +26,32 @@ export const useLinkBlockEditor = (params: LinkBlockEditorParams) => {
     [values.url, values.title]
   );
 
-  const save = async (v: LinkBlockState) => {
+  const save = (v: LinkBlockState) => {
     if (params.mode === "placeholder" && params.onSavePlaceholder) {
-      return params.onSavePlaceholder(v);
+      params.onSavePlaceholder(v);
+      return Promise.resolve();
     }
 
-    if (params.mode === "persisted" && params.blockId) {
-      await updateBlockMutation.mutateAsync({
-        type: "link",
-        blockId: params.blockId,
-        handle: params.handle,
-        url: v.url,
-        title: v.title,
+    const blockId = params.blockId;
+    if (params.mode === "persisted" && blockId) {
+      return new Promise<void>((resolve, reject) => {
+        updateBlockMutation.mutate(
+          {
+            type: "link",
+            blockId,
+            handle: params.handle,
+            url: v.url,
+            title: v.title,
+          },
+          {
+            onSuccess: () => resolve(),
+            onError: (error) => reject(error),
+          }
+        );
       });
     }
+
+    return Promise.resolve();
   };
 
   useDebouncedMutation<LinkBlockState>({

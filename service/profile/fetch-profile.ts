@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Tables } from "@/types/database.types";
 import type { ProfileBffPayload } from "@/types/profile";
 import { buildHandleCandidates } from "./build-handle-candidates";
+import { normalizeBlocks } from "@/service/blocks/block-normalizer";
 
 type PageRecord = Pick<
   Tables<"pages">,
@@ -65,7 +66,7 @@ export const fetchProfile = async (
         return {
           page,
           isOwner: Boolean(userId && userId === page.owner_id),
-          blocks: (blocks ?? []) as BlocksPayload,
+          blocks: normalizeBlocks((blocks ?? []) as BlocksPayload),
         };
       }
     );
