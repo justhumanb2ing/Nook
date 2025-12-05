@@ -11,10 +11,7 @@ import {
   type UpdatePageParams,
   type UpdatePageResult,
 } from "./update-page";
-import {
-  changePageHandle,
-  type ChangeHandleParams,
-} from "./change-handle";
+import { changePageHandle, type ChangeHandleParams } from "./change-handle";
 import {
   togglePageVisibility,
   type TogglePageVisibilityResult,
@@ -216,6 +213,9 @@ export const pageQueryOptions = {
           currentHandle: variables.currentHandle,
           nextHandle: variables.nextHandle,
         };
+      },
+      onSuccess: (data, variables, result) => {
+        window.location.replace(`/profile/@${result.nextHandle}`);
       },
       onError: async (_error, _variables, context) => {
         const queryClient = resolveQueryClient(options.queryClient);

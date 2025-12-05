@@ -1,17 +1,13 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useRef } from "react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
 import { pageQueryOptions } from "@/service/pages/page-query-options";
 import { useSaveStatus } from "@/components/profile/save-status-context";
-import {
-  normalizeHandle,
-  validateHandle,
-} from "@/lib/handle";
+import { normalizeHandle, validateHandle } from "@/lib/handle";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const HandleSchema = z.object({
@@ -65,7 +61,6 @@ export const useHandleChangeForm = ({
   supabase,
   userId,
 }: UseHandleChangeFormParams) => {
-  const router = useRouter();
   const { setStatus } = useSaveStatus();
   const queryClient = useQueryClient();
   const normalizedInitialHandle = normalizeHandle(handle);
@@ -91,51 +86,28 @@ export const useHandleChangeForm = ({
     },
   });
 
-  // TODO: 핸들 변경 성공 후, URL 변경이 안되는 문제 수정 필요
-  const onSubmit = useCallback(
-    async (data: HandleSchemaType) => {
-      setStatus("saving");
-      try {
-        const result = await changeHandleMutation.mutateAsync(
-          {
-            pageId: data.pageId,
-            ownerId: data.ownerId,
-            currentHandle: currentHandleRef.current,
-            nextHandle: data.handle,
-          },
-        );
-
-        if (!result.ok) {
+  const onSubmit = async (data: HandleSchemaType) => {
+    return await changeHandleMutation.mutateAsync(
+      {
+        pageId: data.pageId,
+        ownerId: data.ownerId,
+        currentHandle: currentHandleRef.current,
+        nextHandle: data.handle,
+      },
+      {
+        onSettled: () => {
+          setStatus("saving");
+        },
+        onSuccess: () => {
+          setStatus("saved");
+        },
+        onError: (error) => {
           setStatus("error");
-          const message =
-            result.reason === "HANDLE_ALREADY_EXISTS"
-              ? "이미 사용 중인 핸들입니다."
-              : result.reason;
-
-          form.setError("handle", { message });
-          throw new Error(message);
-        }
-
-        const normalizedNextHandle = normalizeHandle(data.handle);
-        currentHandleRef.current = normalizedNextHandle;
-        const nextPath = `/profile/@${normalizedNextHandle}`;
-  
-        form.reset({
-          pageId: data.pageId,
-          ownerId: data.ownerId,
-          handle: normalizedNextHandle,
-        });
-        setStatus("saved");
-
-        router.replace(nextPath);
-        router.refresh();
-      } catch (error) {
-        setStatus("error");
-        throw error;
+          console.error("[HANDLE_CHANGE_FAILED]", error);
+        },
       }
-    },
-    [changeHandleMutation, form, router, setStatus]
-  );
+    );
+  };
 
   return {
     form,

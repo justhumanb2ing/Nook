@@ -41,13 +41,7 @@ export const HandleChangeForm = ({
 
   return (
     <Form {...form}>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          void form.handleSubmit(onSubmit)();
-        }}
-        className="space-y-2"
-      >
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
         <input type="hidden" {...form.register("pageId")} />
         <input type="hidden" {...form.register("ownerId")} />
 
