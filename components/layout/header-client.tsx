@@ -18,6 +18,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createBrowserSupabaseClient } from "@/config/supabase-browser";
 import { Item } from "@/components/ui/item";
 import { pageQueryOptions } from "@/service/pages/page-query-options";
+import { Button } from "../ui/button";
 
 type HeaderClientProps = {
   userId: string | null;
@@ -50,15 +51,19 @@ export default function HeaderClient({ userId }: HeaderClientProps) {
   return (
     <Item
       asChild
-      className="fixed w-full top-0 flex justify-end items-center p-4 gap-4 h-16 border-none shadow-none bg-background/50 backdrop-blur-sm"
+      className="w-full flex justify-end items-center p-2 lg:p-0 gap-2 h-fit border-none shadow-none bg-background"
     >
       <header>
         <SignedOut>
-          <SignInButton />
+          <SignInButton>
+            <Button variant={"ghost"} className="font-medium">
+              Sign in
+            </Button>
+          </SignInButton>
           <SignUpButton>
-            <button className="bg-[#6c47ff] text-white rounded-full font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 cursor-pointer">
-              Sign Up
-            </button>
+            <Button className="font-medium bg-brand-poppy hover:bg-brand-poppy-hover">
+              Start for free
+            </Button>
           </SignUpButton>
         </SignedOut>
         <SignedIn>

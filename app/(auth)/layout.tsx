@@ -1,5 +1,7 @@
 import React from "react";
 
+import AuthVisualPanel from "@/components/auth/auth-visual-panel";
+
 export default function AuthLayout({
   children,
 }: Readonly<{
@@ -11,16 +13,7 @@ export default function AuthLayout({
         <div className="w-full max-w-sm">{children}</div>
       </div>
 
-      <div className="hidden relative lg:flex min-h-full basis-2/3 overflow-hidden rounded-lg bg-blue-400 shadow-2xl">
-        <div className="relative h-full w-full overflow-hidden bg-linear-to-b from-[#60cdf9] to-[#9adcfc]">
-          {/* Logo Bottom Left */}
-          <div className="absolute bottom-[-10px] left-8">
-            <h1 className="text-[12rem] font-display font-bold text-white leading-none tracking-tighter opacity-100 mix-blend-overlay">
-              bella
-            </h1>
-          </div>
-        </div>
-      </div>
+      <AuthVisualPanel />
     </main>
   );
 }

@@ -1,3 +1,7 @@
+import FeatureSection from "@/components/landing/feature-section";
+import FooterSection from "@/components/landing/footer-section";
+import HeroSection from "@/components/landing/hero-section";
+import PricingSection from "@/components/landing/pricing-section";
 import { JsonLd } from "@/components/seo/json-ld";
 import { siteConfig } from "@/config/metadata-config";
 
@@ -18,8 +22,12 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center font-sans dark:bg-black">
+    <div className="h-dvh w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth bg-background text-foreground">
       <JsonLd data={jsonLd} />
+      <HeroSection />
+      <FeatureSection />
+      <PricingSection />
+      <FooterSection />
     </div>
   );
 }
