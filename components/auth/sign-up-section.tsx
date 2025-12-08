@@ -103,7 +103,10 @@ export default function SignUpSection() {
               <SignUp.Action submit asChild>
                 <Button
                   disabled={isGlobalLoading}
-                  className="w-full rounded-xl"
+                  className={cn(
+                    "w-full rounded-xl bg-brand-poppy",
+                    "hover:bg-brand-poppy-hover"
+                  )}
                   size={"lg"}
                 >
                   <Clerk.Loading>
@@ -313,7 +316,10 @@ export default function SignUpSection() {
                   <SignUp.Action submit asChild>
                     <Button
                       disabled={isGlobalLoading}
-                      className="w-full rounded-xl"
+                      className={cn(
+                        "w-full rounded-xl bg-brand-poppy",
+                        "hover:bg-brand-poppy-hover"
+                      )}
                       size={"lg"}
                     >
                       <Clerk.Loading>

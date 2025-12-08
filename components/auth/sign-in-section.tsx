@@ -55,7 +55,10 @@ export default function SignInSection() {
                 <SignIn.Action submit asChild>
                   <Button
                     disabled={isGlobalLoading}
-                    className="w-full rounded-xl"
+                    className={cn(
+                      "w-full rounded-xl bg-brand-indigo",
+                      "hover:bg-brand-indigo-hover"
+                    )}
                     size={"lg"}
                   >
                     <Clerk.Loading>
@@ -214,7 +217,10 @@ export default function SignInSection() {
                   <SignIn.Action submit asChild>
                     <Button
                       disabled={isGlobalLoading}
-                      className="w-full mt-4 rounded-xl"
+                      className={cn(
+                        "w-full mt-4 rounded-xl bg-brand-indigo",
+                        "hover:bg-brand-indigo-hover"
+                      )}
                       size={"lg"}
                     >
                       <Clerk.Loading>
