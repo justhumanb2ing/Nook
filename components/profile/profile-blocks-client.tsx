@@ -235,6 +235,7 @@ export const ProfileBlocksClient = ({
 
       applyOptimisticLayout(layoutPayload);
       scheduleLayoutSave(layoutPayload);
+      console.log(layoutPayload);
     },
     [applyOptimisticLayout, isOwner, isSavingLayout, scheduleLayoutSave]
   );

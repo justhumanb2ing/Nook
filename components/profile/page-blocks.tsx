@@ -133,8 +133,8 @@ const toCanonicalLayout = (items: BlockItem[]): Layout[] => {
       const { block } = item;
       return {
         id: block.id,
-        x: block.x ?? 0,
-        y: block.y ?? index,
+        x: block.y ?? 0, // horizontal position
+        y: block.x ?? index, // vertical position
         w: block.w ?? MIN_SIZE,
         h: block.h ?? MIN_SIZE,
       };
@@ -142,7 +142,7 @@ const toCanonicalLayout = (items: BlockItem[]): Layout[] => {
     return {
       id: item.id,
       x: 0,
-      y: index,
+      y: index, // place placeholders vertically
       w: MIN_SIZE,
       h: MIN_SIZE,
     };
@@ -181,11 +181,11 @@ const buildLayoutItem = (
   const height = clampSpan(block?.h, MAX_SIZE);
   const maxX = columns - width;
   const maxY = GRID_ROWS - height;
-  const fallbackY = block?.y ?? fallbackIndex;
+  const fallbackY = block?.x ?? fallbackIndex;
 
   return {
     i: toLayoutId(item),
-    x: clampCoordinate(block?.x, maxX),
+    x: clampCoordinate(block?.y, maxX),
     y: clampCoordinate(fallbackY, maxY),
     w: width,
     h: height,
@@ -308,13 +308,13 @@ const extractLayoutPayload = (
     .map((item) => {
       const width = clampSpan(item.w, columnsForPayload);
       const height = clampSpan(item.h, MAX_SIZE);
-      const maxX = columnsForPayload - width;
-      const maxY = GRID_ROWS - height;
+      const maxX = GRID_ROWS - height;
+      const maxY = columnsForPayload - width;
 
       return {
         id: item.i,
-        x: clampCoordinate(item.x, maxX),
-        y: clampCoordinate(item.y, maxY),
+        x: clampCoordinate(item.y, maxX), // vertical coordinate persisted as x
+        y: clampCoordinate(item.x, maxY), // horizontal coordinate persisted as y
         w: width,
         h: height,
       };

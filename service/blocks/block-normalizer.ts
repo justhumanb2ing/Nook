@@ -11,8 +11,14 @@ import {
 const toStringOrNull = (value: unknown): string | null =>
   typeof value === "string" ? value : null;
 
-const toNumberOrNull = (value: unknown): number | null =>
-  typeof value === "number" ? value : null;
+const toNumberOrNull = (value: unknown): number | undefined => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (!Number.isNaN(parsed) && Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+};
 
 const clampSize = (value: number | null | undefined): number => {
   if (typeof value !== "number" || Number.isNaN(value)) return MIN_SIZE;
@@ -30,11 +36,11 @@ const clampCoordinate = (
 const sanitizeLayout = (layout: Partial<BlockLayout>): BlockLayout => {
   const w = clampSize(layout.w);
   const h = clampSize(layout.h);
-  const x = clampCoordinate(layout.x, GRID_COLUMNS - 1);
-  const y = clampCoordinate(layout.y, GRID_ROWS - 1);
+  const x = clampCoordinate(layout.x, GRID_ROWS - 1);
+  const y = clampCoordinate(layout.y, GRID_COLUMNS - 1);
 
-  const maxX = Math.min(x, GRID_COLUMNS - w);
-  const maxY = Math.min(y, GRID_ROWS - h);
+  const maxX = Math.min(x, GRID_ROWS - h);
+  const maxY = Math.min(y, GRID_COLUMNS - w);
 
   return {
     id: String(layout.id ?? crypto.randomUUID()),
