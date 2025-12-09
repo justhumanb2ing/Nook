@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-asserted-optional-chain */
 "use client";
 
 import Link from "next/link";
@@ -6,7 +7,6 @@ import {
   SignUpButton,
   SignedIn,
   SignedOut,
-  UserButton,
   useAuth,
   useUser,
 } from "@clerk/nextjs";
@@ -21,6 +21,9 @@ import { pageQueryOptions } from "@/service/pages/page-query-options";
 import { normalizeHandle } from "@/lib/handle";
 import { Button } from "../ui/button";
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import Logo from "./logo";
+
 type HeaderClientProps = {
   userId: string | null;
 };
@@ -32,7 +35,7 @@ const buildProfilePath = (handle: string): string => {
 
 export default function HeaderClient({ userId }: HeaderClientProps) {
   const { getToken } = useAuth();
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const supabase: SupabaseClient = useMemo(
     () => createBrowserSupabaseClient(() => getToken()),
     [getToken]
@@ -49,61 +52,76 @@ export default function HeaderClient({ userId }: HeaderClientProps) {
   return (
     <Item
       asChild
-      className="w-full flex justify-end items-center p-2 lg:p-0 gap-2 h-fit border-none shadow-none bg-background"
+      className="w-full flex items-center p-2 lg:p-0 gap-2 h-fit border-none shadow-none bg-background"
     >
-      <header>
-        <SignedOut>
-          <SignInButton>
-            <Button variant={"ghost"} className="font-medium">
-              Sign in
-            </Button>
-          </SignInButton>
-          <SignUpButton>
-            <Button className="font-medium bg-brand-poppy hover:bg-brand-poppy-hover">
-              Start for free
-            </Button>
-          </SignUpButton>
-        </SignedOut>
-        <SignedIn>
-          <div className="flex items-center gap-3">
-            {/* 온보딩 완료된 사용자만 핸들 목록 표시 */}
-            {isOnboardingComplete && userId ? (
-              <QueryErrorResetBoundary>
-                {({ reset }) => (
-                  <ErrorBoundary onReset={reset} fallback={<div>Error</div>}>
-                    <Suspense fallback={<div>Loading</div>}>
-                      <SuspenseQuery
-                        {...pageQueryOptions.byOwner(userId, supabase, userId)}
-                        select={(pages) =>
-                          pages.map((page) => {
-                            const href = buildProfilePath(page.handle);
-                            const label = page.handle;
+      <header className="flex justify-between items-center">
+        <Logo />
+        <aside className="flex items-center gap-2">
+          <SignedOut>
+            <SignInButton>
+              <Button variant={"ghost"} className="font-medium">
+                Sign in
+              </Button>
+            </SignInButton>
+            <SignUpButton>
+              <Button className="font-medium bg-brand-poppy hover:bg-brand-poppy-hover">
+                Start for free
+              </Button>
+            </SignUpButton>
+          </SignedOut>
+          <SignedIn>
+            <div className="flex items-center gap-3">
+              {/* 온보딩 완료된 사용자만 핸들 목록 표시 */}
+              {isOnboardingComplete && userId ? (
+                <QueryErrorResetBoundary>
+                  {({ reset }) => (
+                    <ErrorBoundary onReset={reset} fallback={<div>Error</div>}>
+                      <Suspense fallback={<div>Loading</div>}>
+                        <SuspenseQuery
+                          {...pageQueryOptions.byOwner(
+                            userId,
+                            supabase,
+                            userId
+                          )}
+                          select={(pages) =>
+                            pages.map((page) => {
+                              const href = buildProfilePath(page.handle);
+                              const label = page.handle;
 
-                            return { id: page.id, href, label };
-                          })
-                        }
-                      >
-                        {({ data: pageLinks }) =>
-                          pageLinks.map((page) => (
-                            <Link
-                              key={page.id}
-                              href={page.href}
-                              className="px-3 py-1 text-sm text-zinc-900 transition hover:bg-zinc-100"
-                            >
-                              {page.label}
-                            </Link>
-                          ))
-                        }
-                      </SuspenseQuery>
-                    </Suspense>
-                  </ErrorBoundary>
-                )}
-              </QueryErrorResetBoundary>
-            ) : null}
+                              return { id: page.id, href, label };
+                            })
+                          }
+                        >
+                          {({ data: pageLinks }) =>
+                            pageLinks.map((page) => (
+                              <Link
+                                key={page.id}
+                                href={page.href}
+                                className="px-3 py-1 text-sm text-zinc-900 transition hover:bg-zinc-100"
+                              >
+                                {page.label}
+                              </Link>
+                            ))
+                          }
+                        </SuspenseQuery>
+                      </Suspense>
+                    </ErrorBoundary>
+                  )}
+                </QueryErrorResetBoundary>
+              ) : null}
 
-            <UserButton />
-          </div>
-        </SignedIn>
+              {isLoaded && user?.id && (
+                <Avatar>
+                  <AvatarImage
+                    src={user?.imageUrl}
+                    alt={user?.primaryEmailAddress?.emailAddress!}
+                  />
+                  <AvatarFallback>{user.fullName}</AvatarFallback>
+                </Avatar>
+              )}
+            </div>
+          </SignedIn>
+        </aside>
       </header>
     </Item>
   );
