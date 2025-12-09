@@ -22,7 +22,7 @@ export default function Home() {
   };
 
   return (
-    <div className="h-dvh w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth bg-background text-foreground">
+    <div className="h-dvh w-full overflow-x-hidden overflow-y-scroll snap-y snap-mandatory scroll-smooth bg-background text-foreground">
       <JsonLd data={jsonLd} />
       <HeroSection />
       <FeatureSection />

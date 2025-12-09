@@ -3,6 +3,7 @@
 import { motion } from "motion/react";
 import { Check } from "lucide-react";
 import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
 
 export default function PricingSection() {
   return (
@@ -29,9 +30,11 @@ export default function PricingSection() {
           initial={{ opacity: 0, x: -20 }}
           whileInView={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className="text-center p-10 flex flex-col justify-between hover:scale-[1.02] transition-transform duration-300 font-bold"
+          className="text-center p-10 flex justify-center hover:scale-[1.02] transition-transform duration-300 font-bold"
         >
-          Coming Soon!
+          <Badge variant={"secondary"} className="bg-brand-indigo text-white font-medium px-3 py-1">
+            Coming Soon!
+          </Badge>
         </motion.div>
         {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           <motion.div
