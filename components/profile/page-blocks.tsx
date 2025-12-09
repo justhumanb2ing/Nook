@@ -4,6 +4,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   useCallback,
@@ -12,7 +13,9 @@ import {
 } from "react";
 import {
   DndContext,
+  DragOverlay,
   type DragEndEvent,
+  type DragStartEvent,
   PointerSensor,
   TouchSensor,
   useSensor,
@@ -46,6 +49,7 @@ import {
 } from "@/components/profile/block-editors";
 import { useSaveStatus } from "@/components/profile/save-status-context";
 import { cn } from "@/lib/utils";
+import { deriveLayoutMap, type LayoutInput } from "@/service/blocks/block-layout";
 
 type PlaceholderBlock = { kind: "placeholder"; id: string; type: BlockType };
 type PersistedBlock = { kind: "persisted"; block: BlockWithDetails };
@@ -55,6 +59,8 @@ type BlockItem = PlaceholderBlock | PersistedBlock;
 type SortableRenderProps = {
   isDragging: boolean;
   isDraggable: boolean;
+  isOver?: boolean;
+  isOverlay?: boolean;
 };
 
 type DragGuardHandlers = Pick<
@@ -110,6 +116,12 @@ export const PageBlocks = ({
 }: PageBlocksProps) => {
   const { setStatus } = useSaveStatus();
   const [isMounted, setIsMounted] = useState(false);
+  const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+  const [activeBlockSize, setActiveBlockSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+  const blockNodeMap = useRef<Map<string, HTMLElement>>(new Map());
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, {
@@ -130,6 +142,39 @@ export const PageBlocks = ({
     }),
     [stopEventPropagation]
   );
+  const registerBlockNode = useCallback(
+    (id: string, node: HTMLElement | null) => {
+      if (!id) return;
+      if (node) {
+        blockNodeMap.current.set(id, node);
+      } else {
+        blockNodeMap.current.delete(id);
+      }
+    },
+    []
+  );
+  const resetActiveDrag = useCallback(() => {
+    setActiveBlockId(null);
+    setActiveBlockSize(null);
+  }, []);
+  const handleDragStart = useCallback(({ active }: DragStartEvent) => {
+    const currentId = String(active.id);
+    setActiveBlockId(currentId);
+    const rect = blockNodeMap.current.get(currentId)?.getBoundingClientRect();
+    if (rect) {
+      setActiveBlockSize({ width: rect.width, height: rect.height });
+    }
+  }, []);
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      onReorder?.(event);
+      resetActiveDrag();
+    },
+    [onReorder, resetActiveDrag]
+  );
+  const handleDragCancel = useCallback(() => {
+    resetActiveDrag();
+  }, [resetActiveDrag]);
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -155,12 +200,59 @@ export const PageBlocks = ({
       }),
     [items]
   );
+  const layoutInputs = useMemo<LayoutInput[]>(
+    () =>
+      sortedBlocks.map((item) => {
+        if (item.kind === "persisted") {
+          const { block } = item;
+          return {
+            id: block.id,
+            x: block.x ?? 0,
+            y: block.y ?? 0,
+            w: block.w ?? 1,
+            h: block.h ?? 1,
+          };
+        }
+        return {
+          id: item.id,
+          x: 0,
+          y: 0,
+          w: 1,
+          h: 1,
+        };
+      }),
+    [sortedBlocks]
+  );
+  const layoutMap = useMemo(
+    () => deriveLayoutMap(layoutInputs),
+    [layoutInputs]
+  );
+  const resolveLayoutStyle = useCallback(
+    (id: string): CSSProperties | undefined => {
+      const layout = layoutMap.get(id);
+      if (!layout) return undefined;
+      return {
+        gridColumnStart: layout.x + 1,
+        gridColumnEnd: `span ${layout.w}`,
+        gridRowStart: layout.y + 1,
+        gridRowEnd: `span ${layout.h}`,
+      };
+    },
+    [layoutMap]
+  );
   const sortableBlocks = useMemo(
     () =>
       sortedBlocks.filter(
         (item): item is PersistedBlock => item.kind === "persisted"
       ),
     [sortedBlocks]
+  );
+  const activeBlock = useMemo(
+    () =>
+      activeBlockId
+        ? sortableBlocks.find((item) => item.block.id === activeBlockId)
+        : null,
+    [activeBlockId, sortableBlocks]
   );
   const canSort = Boolean(
     isMounted && isOwner && onReorder && sortableBlocks.length > 1
@@ -176,12 +268,14 @@ export const PageBlocks = ({
     const blockId = block?.id;
     const isDeleting = Boolean(blockId && deletingBlockIds?.has(blockId));
     const isDraggable = sortableProps?.isDraggable;
+    const isOverlay = sortableProps?.isOverlay;
 
     return (
       <div
         className={cn(
-          "group relative h-full rounded-2xl border bg-white p-2 shadow-xs min-h-32 flex flex-col",
-          sortableProps?.isDragging ? "border-2 shadow-md" : "",
+          "group relative h-full rounded-2xl border p-2 shadow-xs min-h-32 flex flex-col transition-shadow",
+          isOverlay ? "bg-white pointer-events-none" : "bg-white",
+          sortableProps?.isDragging ? "border-2 shadow-lg z-20" : "",
           isDraggable ? "cursor-grab active:cursor-grabbing" : ""
         )}
       >
@@ -295,14 +389,19 @@ export const PageBlocks = ({
   };
 
   const renderGrid = (withSortable: boolean) => (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid h-full grid-cols-4 auto-rows-[minmax(6rem,1fr)] gap-3">
       {sortedBlocks.map((item) => {
+        const key = item.kind === "persisted" ? item.block.id : item.id;
+        const layoutStyle = resolveLayoutStyle(key);
+
         if (withSortable && item.kind === "persisted") {
           return (
             <SortableBlockCard
               key={item.block.id}
               id={item.block.id}
               disabled={disableReorder}
+              gridStyle={layoutStyle}
+              onNodeRefChange={(node) => registerBlockNode(item.block.id, node)}
             >
               {(sortableProps) => renderBlockCard(item, sortableProps)}
             </SortableBlockCard>
@@ -310,7 +409,7 @@ export const PageBlocks = ({
         }
 
         return (
-          <div key={item.kind === "persisted" ? item.block.id : item.id}>
+          <div key={key} style={layoutStyle} className="h-full">
             {renderBlockCard(item)}
           </div>
         );
@@ -360,13 +459,39 @@ export const PageBlocks = ({
 
   return (
     <section className="space-y-3 w-full">
-      <DndContext sensors={sensors} onDragEnd={onReorder}>
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
         <SortableContext
           items={sortableBlocks.map((block) => block.block.id)}
           strategy={rectSortingStrategy}
         >
           {renderGrid(true)}
         </SortableContext>
+        <DragOverlay dropAnimation={null}>
+          {activeBlock ? (
+            <div
+              style={
+                activeBlockSize
+                  ? {
+                      width: activeBlockSize.width,
+                      height: activeBlockSize.height,
+                    }
+                  : undefined
+              }
+              className="pointer-events-none"
+            >
+              {renderBlockCard(activeBlock, {
+                isDragging: true,
+                isDraggable: false,
+                isOverlay: true,
+              })}
+            </div>
+          ) : null}
+        </DragOverlay>
       </DndContext>
     </section>
   );
@@ -375,12 +500,16 @@ export const PageBlocks = ({
 type SortableBlockCardProps = {
   id: string;
   disabled?: boolean;
+  gridStyle?: CSSProperties;
+  onNodeRefChange?: (node: HTMLElement | null) => void;
   children: (props: SortableRenderProps) => ReactNode;
 };
 
 const SortableBlockCard = ({
   id,
   disabled,
+  gridStyle,
+  onNodeRefChange,
   children,
 }: SortableBlockCardProps) => {
   const {
@@ -390,22 +519,34 @@ const SortableBlockCard = ({
     transform,
     transition,
     isDragging,
+    isOver,
   } = useSortable({ id, disabled });
 
+  const setCombinedNodeRef = useCallback(
+    (node: HTMLElement | null) => {
+      setNodeRef(node);
+      onNodeRefChange?.(node);
+    },
+    [onNodeRefChange, setNodeRef]
+  );
+
   const style: CSSProperties = {
+    ...gridStyle,
     transform: CSS.Transform.toString(transform),
     transition,
+    zIndex: isDragging ? 30 : undefined,
+    opacity: isDragging ? 0 : undefined,
   };
 
   return (
     <div
-      ref={setNodeRef}
+      ref={setCombinedNodeRef}
       style={style}
       className="h-full"
       {...(disabled ? {} : attributes)}
       {...(disabled ? {} : listeners)}
     >
-      {children({ isDragging, isDraggable: !disabled })}
+      {children({ isDragging, isDraggable: !disabled, isOver })}
     </div>
   );
 };

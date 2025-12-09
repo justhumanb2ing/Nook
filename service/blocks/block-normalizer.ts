@@ -1,5 +1,12 @@
 import type { BlockType } from "@/config/block-registry";
 import type { BlockWithDetails } from "@/types/block";
+import {
+  GRID_COLUMNS,
+  GRID_ROWS,
+  MAX_SIZE,
+  MIN_SIZE,
+  type BlockLayout,
+} from "./block-layout";
 
 const toStringOrNull = (value: unknown): string | null =>
   typeof value === "string" ? value : null;
@@ -7,24 +14,72 @@ const toStringOrNull = (value: unknown): string | null =>
 const toNumberOrNull = (value: unknown): number | null =>
   typeof value === "number" ? value : null;
 
+const clampSize = (value: number | null | undefined): number => {
+  if (typeof value !== "number" || Number.isNaN(value)) return MIN_SIZE;
+  return Math.min(Math.max(value, MIN_SIZE), MAX_SIZE);
+};
+
+const clampCoordinate = (
+  value: number | null | undefined,
+  maxIndex: number
+): number => {
+  if (typeof value !== "number" || Number.isNaN(value)) return 0;
+  return Math.min(Math.max(value, 0), maxIndex);
+};
+
+const sanitizeLayout = (layout: Partial<BlockLayout>): BlockLayout => {
+  const w = clampSize(layout.w);
+  const h = clampSize(layout.h);
+  const x = clampCoordinate(layout.x, GRID_COLUMNS - 1);
+  const y = clampCoordinate(layout.y, GRID_ROWS - 1);
+
+  const maxX = Math.min(x, GRID_COLUMNS - w);
+  const maxY = Math.min(y, GRID_ROWS - h);
+
+  return {
+    id: String(layout.id ?? crypto.randomUUID()),
+    x: Math.max(0, maxX),
+    y: Math.max(0, maxY),
+    w,
+    h,
+  };
+};
+
+const compareByOrdering = (a: BlockWithDetails, b: BlockWithDetails) => {
+  const aOrder =
+    typeof a.ordering === "number" ? a.ordering : Number.MAX_SAFE_INTEGER;
+  const bOrder =
+    typeof b.ordering === "number" ? b.ordering : Number.MAX_SAFE_INTEGER;
+  if (aOrder !== bOrder) return aOrder - bOrder;
+  const aCreated = a.created_at ?? "";
+  const bCreated = b.created_at ?? "";
+  return aCreated.localeCompare(bCreated);
+};
+
+const compareByLayout = (a: BlockWithDetails, b: BlockWithDetails) => {
+  const yDiff = a.y - b.y;
+  if (yDiff !== 0) return yDiff;
+  const xDiff = a.x - b.x;
+  if (xDiff !== 0) return xDiff;
+  return compareByOrdering(a, b);
+};
+
+const toSequentialOrdering = (
+  blocks: BlockWithDetails[],
+  comparator: (a: BlockWithDetails, b: BlockWithDetails) => number
+): BlockWithDetails[] =>
+  [...blocks]
+    .sort(comparator)
+    .map((block, index) => ({ ...block, ordering: index }));
+
 /**
  * BlockWithDetails 배열의 ordering을 0부터 연속된 값으로 재정렬한다.
- * - ordering이 없거나 null인 경우 배열 위치를 기반으로 채운다.
+ * - 기본 정렬은 ordering→created_at이며, 다른 comparator를 주입해 커스터마이즈할 수 있다.
  */
 export const resequenceBlocks = (
-  blocks: BlockWithDetails[]
-): BlockWithDetails[] => {
-  const sorted = [...blocks].sort((a, b) => {
-    const aOrder = typeof a.ordering === "number" ? a.ordering : Number.MAX_SAFE_INTEGER;
-    const bOrder = typeof b.ordering === "number" ? b.ordering : Number.MAX_SAFE_INTEGER;
-    if (aOrder !== bOrder) return aOrder - bOrder;
-    const aCreated = a.created_at ?? "";
-    const bCreated = b.created_at ?? "";
-    return aCreated.localeCompare(bCreated);
-  });
-
-  return sorted.map((block, index) => ({ ...block, ordering: index }));
-};
+  blocks: BlockWithDetails[],
+  comparator: (a: BlockWithDetails, b: BlockWithDetails) => number = compareByOrdering
+): BlockWithDetails[] => toSequentialOrdering(blocks, comparator);
 
 type RawBlock = Partial<BlockWithDetails> & Record<string, unknown>;
 
@@ -43,6 +98,13 @@ export const toBlockWithDetails = (
     typeof block.created_at === "string"
       ? block.created_at
       : new Date().toISOString(),
+  ...pickLayoutFields({
+    id: block.id,
+    x: toNumberOrNull(block.x),
+    y: toNumberOrNull(block.y),
+    w: toNumberOrNull(block.w),
+    h: toNumberOrNull(block.h),
+  }),
   content: toStringOrNull(block.content),
   url: toStringOrNull(block.url),
   title: toStringOrNull(block.title),
@@ -62,7 +124,11 @@ export const toBlockWithDetails = (
  */
 export const normalizeBlocks = (
   blocks: RawBlock[]
-): BlockWithDetails[] => resequenceBlocks(blocks.map((block, index) => toBlockWithDetails(block, index)));
+): BlockWithDetails[] =>
+  resequenceBlocks(
+    blocks.map((block, index) => toBlockWithDetails(block, index)),
+    compareByLayout
+  );
 
 const pickBlockDataFields = (
   data: Record<string, unknown>
@@ -81,6 +147,13 @@ const pickBlockDataFields = (
   zoom: toNumberOrNull(data.zoom),
 });
 
+const pickLayoutFields = (
+  data: Partial<BlockLayout>
+): Pick<BlockWithDetails, "x" | "y" | "w" | "h"> => {
+  const sanitized = sanitizeLayout(data);
+  return { x: sanitized.x, y: sanitized.y, w: sanitized.w, h: sanitized.h };
+};
+
 /**
  * 낙관적 UI용 BlockWithDetails를 생성한다.
  */
@@ -95,6 +168,12 @@ export const createOptimisticBlock = (
   type: params.type,
   ordering: params.currentLength,
   created_at: new Date().toISOString(),
+  ...pickLayoutFields({
+    x: 0,
+    y: 0,
+    w: MIN_SIZE,
+    h: MIN_SIZE,
+  }),
   ...pickBlockDataFields(params.data),
 });
 
@@ -131,3 +210,39 @@ export const applyContentPatch = (
     }
     return { ...block, url: params.url, title: params.title };
   });
+
+export type LayoutPatchPayload = BlockLayout[];
+
+export const applyLayoutPatch = (
+  blocks: BlockWithDetails[],
+  payload: LayoutPatchPayload,
+  options?: { preserveOrdering?: boolean }
+): BlockWithDetails[] => {
+  const layoutMap = new Map(
+    payload.map((item, index) => [
+      item.id,
+      {
+        ...pickLayoutFields(item),
+        ordering: options?.preserveOrdering ? undefined : index,
+      },
+    ])
+  );
+
+  const patched = blocks.map((block) => {
+    const layout = layoutMap.get(block.id);
+    if (!layout) return block;
+    const next: BlockWithDetails = {
+      ...block,
+      x: layout.x,
+      y: layout.y,
+      w: layout.w,
+      h: layout.h,
+    };
+    if (typeof layout.ordering === "number") {
+      next.ordering = layout.ordering;
+    }
+    return next;
+  });
+
+  return options?.preserveOrdering ? patched : resequenceBlocks(patched);
+};

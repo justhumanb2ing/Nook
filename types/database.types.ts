@@ -182,24 +182,36 @@ export type Database = {
       blocks: {
         Row: {
           created_at: string | null
+          h: number
           id: string
           ordering: number | null
           page_id: string
           type: Database["public"]["Enums"]["block_type"]
+          w: number
+          x: number
+          y: number
         }
         Insert: {
           created_at?: string | null
+          h?: number
           id?: string
           ordering?: number | null
           page_id: string
           type: Database["public"]["Enums"]["block_type"]
+          w?: number
+          x?: number
+          y?: number
         }
         Update: {
           created_at?: string | null
+          h?: number
           id?: string
           ordering?: number | null
           page_id?: string
           type?: Database["public"]["Enums"]["block_type"]
+          w?: number
+          x?: number
+          y?: number
         }
         Relationships: [
           {
@@ -295,6 +307,10 @@ export type Database = {
       get_blocks_with_details: { Args: { p_page_id: string }; Returns: Json }
       get_primary_page: { Args: { p_owner_id: string }; Returns: Json }
       reorder_blocks_after_dnd: {
+        Args: { p_blocks: Json; p_page_id: string }
+        Returns: undefined
+      }
+      save_block_layout: {
         Args: { p_blocks: Json; p_page_id: string }
         Returns: undefined
       }

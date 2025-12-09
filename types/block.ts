@@ -7,6 +7,10 @@ export type BlockWithDetails = {
   type: BlockRow["type"];
   ordering: BlockRow["ordering"];
   created_at: BlockRow["created_at"];
+  x: BlockRow["x"];
+  y: BlockRow["y"];
+  w: BlockRow["w"];
+  h: BlockRow["h"];
   content?: Tables<"block_text">["content"] | null;
   url?: Tables<"block_link">["url"] | Tables<"block_video">["video_url"] | null;
   title?: Tables<"block_link">["title"] | null;

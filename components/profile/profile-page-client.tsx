@@ -59,7 +59,7 @@ export default function ProfilePageClient({
               >
                 {({ data: { isOwner, page, blocks } }) => {
                   const profile = { isOwner, page };
-
+                  
                   return (
                     <SaveStatusProvider>
                       <>

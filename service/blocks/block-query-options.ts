@@ -22,10 +22,15 @@ import {
 } from "./update-block-content";
 import {
   applyContentPatch,
+  applyLayoutPatch,
   applyOrderingPatch,
   createOptimisticBlock,
   resequenceBlocks,
 } from "./block-normalizer";
+import {
+  requestSaveBlockLayout,
+  type SaveBlockLayoutParams,
+} from "./save-block-layout";
 
 const blockQueryKey = ["block"] as const;
 const resolveQueryClient = (client?: QueryClient): QueryClient =>
@@ -73,6 +78,10 @@ type ReorderBlocksVariables = Omit<
   "supabase" | "userId"
 >;
 type UpdateBlockContentVariables = UpdateBlockContentParams;
+type SaveBlockLayoutVariables = Omit<
+  SaveBlockLayoutParams,
+  "supabase" | "userId"
+>;
 
 const resolveHandle = (
   variablesHandle?: PageHandle,
@@ -336,6 +345,63 @@ export const blockQueryOptions = {
         if (previous) {
           setProfileBlocks(queryClient, targetHandle, (blocks) =>
             applyOrderingPatch(blocks, variables.blocks)
+          );
+        }
+
+        return { handle: targetHandle, previous };
+      },
+      onError: (error, variables, context) => {
+        const queryClient = resolveQueryClient(options?.queryClient);
+        rollbackProfile(queryClient, context);
+        options.callbacks?.onError?.(error, variables, context);
+      },
+      onSuccess: (_data, variables, context) => {
+        options.callbacks?.onSuccess?.(undefined as void, variables, context);
+      },
+      onSettled: (_data, error, variables, context) => {
+        const queryClient = resolveQueryClient(options?.queryClient);
+        if ((error || !context?.previous) && context?.handle) {
+          invalidateProfile(queryClient, context.handle);
+        }
+        options.callbacks?.onSettled?.(undefined, error ?? null, variables, context);
+      },
+    }),
+  saveLayout: (
+    options: BlockMutationOptionsArgs & {
+      callbacks?: MutationLifecycleCallbacks<void, SaveBlockLayoutVariables>;
+    }
+  ) =>
+    mutationOptions<void, Error, SaveBlockLayoutVariables, BlockMutationContext>({
+      mutationKey: [
+        ...blockQueryKey,
+        "save-layout",
+        options?.pageId ?? "global",
+        options?.handle ?? "global",
+      ] as const,
+      mutationFn: async (variables) => {
+        const result = await requestSaveBlockLayout({
+          supabase: options.supabase,
+          userId: options.userId,
+          ...variables,
+        });
+        throwIfFailed(result);
+      },
+      onMutate: async (variables) => {
+        options.callbacks?.onMutate?.(variables);
+        const queryClient = resolveQueryClient(options?.queryClient);
+        const targetHandle = resolveHandle(variables.handle, options.handle);
+
+        if (targetHandle) {
+          await queryClient.cancelQueries({
+            queryKey: profileQueryOptions.byHandleKey(targetHandle),
+            exact: true,
+          });
+        }
+
+        const previous = getProfileSnapshot(queryClient, targetHandle);
+        if (previous) {
+          setProfileBlocks(queryClient, targetHandle, (blocks) =>
+            applyLayoutPatch(blocks, variables.blocks)
           );
         }
 

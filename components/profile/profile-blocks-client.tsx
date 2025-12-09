@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   useMutation,
   useQueryClient,
@@ -10,7 +10,12 @@ import type { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { BlockWithDetails } from "@/types/block";
 import type { BlockType } from "@/config/block-registry";
-import type { PageHandle, PageId, ProfileOwnership } from "@/types/profile";
+import type {
+  PageHandle,
+  PageId,
+  ProfileBffPayload,
+  ProfileOwnership,
+} from "@/types/profile";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { BlockRegistryPanel } from "@/components/layout/block-registry";
 import { PageBlocks } from "@/components/profile/page-blocks";
@@ -19,6 +24,12 @@ import { useSaveStatus } from "@/components/profile/save-status-context";
 import { blockQueryOptions } from "@/service/blocks/block-query-options";
 import { profileQueryOptions } from "@/service/profile/profile-query-options";
 import { BlockEnvProvider } from "@/hooks/use-block-env";
+import {
+  buildLayoutPayload,
+  deriveLayoutMap,
+  type BlockLayout,
+} from "@/service/blocks/block-layout";
+import { applyLayoutPatch } from "@/service/blocks/block-normalizer";
 
 type BlockItem =
   | { kind: "persisted"; block: BlockWithDetails }
@@ -33,7 +44,7 @@ type ProfileBlocksClientProps = ProfileOwnership & {
 };
 
 export const ProfileBlocksClient = ({
-  initialBlocks: _initialBlocks,
+  initialBlocks,
   handle,
   pageId,
   supabase,
@@ -45,6 +56,8 @@ export const ProfileBlocksClient = ({
   const [deletingBlockIds, setDeletingBlockIds] = useState<Set<string>>(
     () => new Set()
   );
+  const layoutDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const latestLayoutRef = useRef<BlockLayout[] | null>(null);
   const queryClient = useQueryClient();
   const { setStatus } = useSaveStatus();
   const { data: profile } = useSuspenseQuery(
@@ -83,8 +96,8 @@ export const ProfileBlocksClient = ({
       },
     })
   );
-  const reorderBlocksMutation = useMutation(
-    blockQueryOptions.reorder({
+  const saveLayoutMutation = useMutation(
+    blockQueryOptions.saveLayout({
       pageId,
       handle,
       queryClient,
@@ -97,7 +110,7 @@ export const ProfileBlocksClient = ({
       },
     })
   );
-  const isReordering = reorderBlocksMutation.isPending;
+  const isSavingLayout = saveLayoutMutation.isPending;
 
   const handleAddPlaceholder = useCallback(
     (type: BlockType) => {
@@ -120,6 +133,74 @@ export const ProfileBlocksClient = ({
       setStatus("idle");
     },
     [setStatus]
+  );
+
+  const buildLayoutForBlocks = useCallback(
+    (
+      blocks: BlockWithDetails[],
+      options?: { preservePosition?: boolean }
+    ): BlockLayout[] => {
+      const inputs = blocks.map(({ id, x, y, w, h }) => ({
+        id,
+        x: options?.preservePosition ? x : 0,
+        y: options?.preservePosition ? y : 0,
+        w,
+        h,
+      }));
+      const layoutMap = deriveLayoutMap(inputs);
+      return buildLayoutPayload(inputs, layoutMap);
+    },
+    []
+  );
+
+  const applyOptimisticLayout = useCallback(
+    (layoutPayload: BlockLayout[]) => {
+      queryClient.setQueryData<ProfileBffPayload | undefined>(
+        profileQueryOptions.byHandleKey(handle),
+        (previous) => {
+          if (!previous) return previous;
+          return {
+            ...previous,
+            blocks: applyLayoutPatch(previous.blocks, layoutPayload),
+          };
+        }
+      );
+    },
+    [handle, queryClient]
+  );
+
+  const scheduleLayoutSave = useCallback(
+    (layoutPayload: BlockLayout[]) => {
+      latestLayoutRef.current = layoutPayload;
+      setStatus("dirty");
+      if (layoutDebounceRef.current) {
+        clearTimeout(layoutDebounceRef.current);
+      }
+      layoutDebounceRef.current = setTimeout(() => {
+        if (!latestLayoutRef.current) return;
+        saveLayoutMutation.mutate(
+          {
+            handle,
+            pageId,
+            blocks: latestLayoutRef.current,
+          },
+          {
+            onError: (error) => {
+              const message =
+                error instanceof Error
+                  ? error.message
+                  : "레이아웃 저장에 실패했습니다.";
+              toastManager.add({
+                title: "레이아웃 저장 실패",
+                description: message,
+                type: "error",
+              });
+            },
+          }
+        );
+      }, 300);
+    },
+    [handle, pageId, saveLayoutMutation, setStatus]
   );
 
   const handleDeleteBlock = useCallback(
@@ -178,9 +259,10 @@ export const ProfileBlocksClient = ({
         !isOwner ||
         !over ||
         active.id === over.id ||
-        reorderBlocksMutation.isPending
-      )
+        isSavingLayout
+      ) {
         return;
+      }
 
       const activeIndex = persistedBlocks.findIndex(
         (block) => block.id === active.id
@@ -195,33 +277,20 @@ export const ProfileBlocksClient = ({
         persistedBlocks,
         activeIndex,
         overIndex
-      ).map((block, ordering) => ({
-        id: block.id,
-        ordering,
-      }));
-
-      reorderBlocksMutation.mutate(
-        {
-          pageId,
-          handle,
-          blocks: reorderedPersisted,
-        },
-        {
-          onError: (error) => {
-            const message =
-              error instanceof Error
-                ? error.message
-                : "잠시 후 다시 시도해 주세요.";
-            toastManager.add({
-              title: "순서 변경 실패",
-              description: message,
-              type: "error",
-            });
-          },
-        }
       );
+      const layoutPayload = buildLayoutForBlocks(reorderedPersisted);
+
+      applyOptimisticLayout(layoutPayload);
+      scheduleLayoutSave(layoutPayload);
     },
-    [handle, isOwner, pageId, persistedBlocks, reorderBlocksMutation]
+    [
+      applyOptimisticLayout,
+      buildLayoutForBlocks,
+      isOwner,
+      isSavingLayout,
+      persistedBlocks,
+      scheduleLayoutSave,
+    ]
   );
 
   const handleSavePlaceholder = useCallback(
@@ -271,6 +340,15 @@ export const ProfileBlocksClient = ({
     ...placeholders,
   ];
 
+  useEffect(
+    () => () => {
+      if (layoutDebounceRef.current) {
+        clearTimeout(layoutDebounceRef.current);
+      }
+    },
+    []
+  );
+
   return (
     <BlockEnvProvider value={blockEnvValue}>
       <div className="space-y-3 flex flex-col items-center">
@@ -286,7 +364,7 @@ export const ProfileBlocksClient = ({
           onDeleteBlock={handleDeleteBlock}
           deletingBlockIds={deletingBlockIds}
           onReorder={handleReorderBlocks}
-          disableReorder={isReordering}
+          disableReorder={isSavingLayout}
         />
       </div>
     </BlockEnvProvider>
