@@ -27,7 +27,7 @@ export default function Home() {
   return (
     <div className="h-dvh w-full overflow-x-hidden overflow-y-scroll snap-y snap-mandatory scroll-smooth bg-background text-foreground">
       <JsonLd data={jsonLd} />
-      <nav className="z-20 bg-background snap-start">
+      <nav className="sticky top-0 z-20 bg-background/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl justify-end">
           <Item
             asChild
