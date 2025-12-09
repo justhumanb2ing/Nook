@@ -6,7 +6,9 @@ import {
   useMemo,
   useState,
   type CSSProperties,
+  useCallback,
   type ReactNode,
+  type HTMLAttributes,
 } from "react";
 import {
   DndContext,
@@ -24,7 +26,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import Image from "next/image";
 import Link from "next/link";
-import { GripVertical, Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import type { BlockWithDetails } from "@/types/block";
 import type { BlockType } from "@/config/block-registry";
 
@@ -50,9 +52,14 @@ type PersistedBlock = { kind: "persisted"; block: BlockWithDetails };
 
 type BlockItem = PlaceholderBlock | PersistedBlock;
 
-type SortableRenderProps = Pick<
-  ReturnType<typeof useSortable>,
-  "attributes" | "listeners" | "setActivatorNodeRef" | "isDragging"
+type SortableRenderProps = {
+  isDragging: boolean;
+  isDraggable: boolean;
+};
+
+type DragGuardHandlers = Pick<
+  HTMLAttributes<HTMLElement>,
+  "onPointerDownCapture" | "onMouseDownCapture" | "onTouchStartCapture"
 >;
 
 type PageBlocksProps = {
@@ -109,6 +116,20 @@ export const PageBlocks = ({
       activationConstraint: { delay: 150, tolerance: 5 },
     })
   );
+  const stopEventPropagation = useCallback(
+    (event: { stopPropagation: () => void }) => {
+      event.stopPropagation();
+    },
+    []
+  );
+  const dragGuardHandlers: DragGuardHandlers = useMemo(
+    () => ({
+      onPointerDownCapture: stopEventPropagation,
+      onMouseDownCapture: stopEventPropagation,
+      onTouchStartCapture: stopEventPropagation,
+    }),
+    [stopEventPropagation]
+  );
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -154,30 +175,16 @@ export const PageBlocks = ({
     const type = item.kind === "persisted" ? item.block.type : item.type;
     const blockId = block?.id;
     const isDeleting = Boolean(blockId && deletingBlockIds?.has(blockId));
-    const dragHandle =
-      sortableProps && isOwner && blockId ? (
-        <Button
-          size={"icon-sm"}
-          variant={"outline"}
-          type="button"
-          aria-label="블록 순서 변경"
-          ref={sortableProps.setActivatorNodeRef}
-          {...sortableProps.attributes}
-          {...sortableProps.listeners}
-          className="absolute -left-3 -top-3 inline-flex items-center justify-center rounded-full"
-        >
-          <GripVertical className="size-4" aria-hidden />
-        </Button>
-      ) : null;
+    const isDraggable = sortableProps?.isDraggable;
 
     return (
       <div
         className={cn(
           "group relative h-full rounded-2xl border bg-white p-2 shadow-xs min-h-32 flex flex-col",
-          sortableProps?.isDragging ? "border-2 shadow-md" : ""
+          sortableProps?.isDragging ? "border-2 shadow-md" : "",
+          isDraggable ? "cursor-grab active:cursor-grabbing" : ""
         )}
       >
-        {dragHandle}
         {isOwner && blockId ? (
           <Button
             type="button"
@@ -205,6 +212,7 @@ export const PageBlocks = ({
                 return (
                   <LinkBlockEditor
                     className="flex-1"
+                    dragGuardHandlers={dragGuardHandlers}
                     mode={isPlaceholder ? "placeholder" : "persisted"}
                     blockId={blockId}
                     handle={handle}
@@ -229,6 +237,7 @@ export const PageBlocks = ({
                 return (
                   <TextBlockEditor
                     className="flex-1"
+                    dragGuardHandlers={dragGuardHandlers}
                     mode={isPlaceholder ? "placeholder" : "persisted"}
                     blockId={blockId}
                     handle={handle}
@@ -378,7 +387,6 @@ const SortableBlockCard = ({
     attributes,
     listeners,
     setNodeRef,
-    setActivatorNodeRef,
     transform,
     transition,
     isDragging,
@@ -390,8 +398,14 @@ const SortableBlockCard = ({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="h-full">
-      {children({ attributes, listeners, setActivatorNodeRef, isDragging })}
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="h-full"
+      {...(disabled ? {} : attributes)}
+      {...(disabled ? {} : listeners)}
+    >
+      {children({ isDragging, isDraggable: !disabled })}
     </div>
   );
 };

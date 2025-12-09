@@ -4,11 +4,11 @@ import { useDebouncedMutation } from "./use-debounced-mutation";
 import { useMutation } from "@tanstack/react-query";
 import { useBlockEnv } from "./use-block-env";
 import type {
-  TextBlockEditorParams,
+  TextBlockParams,
   TextBlockState,
 } from "@/types/block-editor";
 
-export const useTextBlockEditor = (params: TextBlockEditorParams) => {
+export const useTextBlockEditor = (params: TextBlockParams) => {
   const { supabase, userId } = useBlockEnv();
   const [values, setValues] = useState<TextBlockState>({
     content: params.data.content ?? "",

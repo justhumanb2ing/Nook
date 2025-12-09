@@ -4,11 +4,12 @@ import { useMutation } from "@tanstack/react-query";
 import { useDebouncedMutation } from "./use-debounced-mutation";
 import { useBlockEnv } from "./use-block-env";
 import type {
-  LinkBlockEditorParams,
+  
+  LinkBlockParams,
   LinkBlockState,
 } from "@/types/block-editor";
 
-export const useLinkBlockEditor = (params: LinkBlockEditorParams) => {
+export const useLinkBlockEditor = (params: LinkBlockParams) => {
   const { supabase, userId } = useBlockEnv();
   const [values, setValues] = useState<LinkBlockState>({
     url: params.data.url ?? "",

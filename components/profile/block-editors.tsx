@@ -1,19 +1,23 @@
 "use client";
 
+import type { HTMLAttributes } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useLinkBlockEditor } from "@/hooks/use-link-block-editor";
 import { useTextBlockEditor } from "@/hooks/use-text-block-editor";
 import { cn } from "@/lib/utils";
-import type {
-  LinkBlockEditorParams,
-  TextBlockEditorParams,
-} from "@/types/block-editor";
+import type { LinkBlockParams, TextBlockParams } from "@/types/block-editor";
 
-export type LinkBlockEditorProps = LinkBlockEditorParams & {
+type DragGuardHandlers = Pick<
+  HTMLAttributes<HTMLElement>,
+  "onPointerDownCapture" | "onMouseDownCapture" | "onTouchStartCapture"
+>;
+
+export type LinkBlockEditorProps = LinkBlockParams & {
   onCancelPlaceholder?: () => void;
   className?: string;
+  dragGuardHandlers?: DragGuardHandlers;
 };
 
 export const LinkBlockEditor = ({
@@ -25,6 +29,7 @@ export const LinkBlockEditor = ({
   onSavePlaceholder,
   onCancelPlaceholder,
   className,
+  dragGuardHandlers,
 }: LinkBlockEditorProps) => {
   const { values, setUrl, setTitle } = useLinkBlockEditor({
     mode,
@@ -49,6 +54,7 @@ export const LinkBlockEditor = ({
           "focus-visible:ring-0 focus-visible:border-none focus-visible:bg-muted transition-colors duration-200",
           "hover:bg-muted"
         )}
+        {...dragGuardHandlers}
       />
 
       <Input
@@ -61,14 +67,24 @@ export const LinkBlockEditor = ({
           "focus-visible:ring-0 focus-visible:border-none focus-visible:bg-muted transition-colors duration-200",
           "hover:bg-muted"
         )}
+        {...dragGuardHandlers}
       />
+
+      {isPlaceholder && (
+        <div className="flex justify-end mt-auto">
+          <Button size="sm" variant="ghost" onClick={onCancelPlaceholder}>
+            취소
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
 
-export type TextBlockEditorProps = TextBlockEditorParams & {
+export type TextBlockEditorProps = TextBlockParams & {
   onCancelPlaceholder?: () => void;
   className?: string;
+  dragGuardHandlers?: DragGuardHandlers;
 };
 
 export const TextBlockEditor = ({
@@ -80,6 +96,7 @@ export const TextBlockEditor = ({
   onSavePlaceholder,
   onCancelPlaceholder,
   className,
+  dragGuardHandlers,
 }: TextBlockEditorProps) => {
   const { values, setContent } = useTextBlockEditor({
     mode,
@@ -104,6 +121,7 @@ export const TextBlockEditor = ({
         "hover:bg-muted",
         className
       )}
+      {...dragGuardHandlers}
     />
   );
 };
