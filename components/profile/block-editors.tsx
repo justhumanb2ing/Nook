@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useLinkBlockEditor } from "@/hooks/use-link-block-editor";
 import { useTextBlockEditor } from "@/hooks/use-text-block-editor";
+import { cn } from "@/lib/utils";
 import type {
   LinkBlockEditorParams,
   TextBlockEditorParams,
@@ -12,6 +13,7 @@ import type {
 
 export type LinkBlockEditorProps = LinkBlockEditorParams & {
   onCancelPlaceholder?: () => void;
+  className?: string;
 };
 
 export const LinkBlockEditor = ({
@@ -22,6 +24,7 @@ export const LinkBlockEditor = ({
   data,
   onSavePlaceholder,
   onCancelPlaceholder,
+  className,
 }: LinkBlockEditorProps) => {
   const { values, setUrl, setTitle } = useLinkBlockEditor({
     mode,
@@ -35,12 +38,17 @@ export const LinkBlockEditor = ({
   const isPlaceholder = mode === "placeholder";
 
   return (
-    <div className="space-y-2">
+    <div className={cn("space-y-2 h-full flex flex-col", className)}>
       <Input
         placeholder="https://example.com"
         value={values.url}
         onChange={(e) => setUrl(e.target.value)}
         disabled={!isOwner}
+        className={cn(
+          "shadow-none border-none",
+          "focus-visible:ring-0 focus-visible:border-none focus-visible:bg-muted transition-colors duration-200",
+          "hover:bg-muted"
+        )}
       />
 
       <Input
@@ -48,21 +56,19 @@ export const LinkBlockEditor = ({
         value={values.title}
         onChange={(e) => setTitle(e.target.value)}
         disabled={!isOwner}
+        className={cn(
+          "shadow-none border-none",
+          "focus-visible:ring-0 focus-visible:border-none focus-visible:bg-muted transition-colors duration-200",
+          "hover:bg-muted"
+        )}
       />
-
-      {isPlaceholder && (
-        <div className="flex justify-end">
-          <Button size="sm" variant="ghost" onClick={onCancelPlaceholder}>
-            취소
-          </Button>
-        </div>
-      )}
     </div>
   );
 };
 
 export type TextBlockEditorProps = TextBlockEditorParams & {
   onCancelPlaceholder?: () => void;
+  className?: string;
 };
 
 export const TextBlockEditor = ({
@@ -73,6 +79,7 @@ export const TextBlockEditor = ({
   data,
   onSavePlaceholder,
   onCancelPlaceholder,
+  className,
 }: TextBlockEditorProps) => {
   const { values, setContent } = useTextBlockEditor({
     mode,
@@ -86,21 +93,17 @@ export const TextBlockEditor = ({
   const isPlaceholder = mode === "placeholder";
 
   return (
-    <div className="space-y-2">
-      <Textarea
-        placeholder="내용을 입력하세요"
-        value={values.content}
-        onChange={(e) => setContent(e.target.value)}
-        disabled={!isOwner}
-      />
-
-      {isPlaceholder && (
-        <div className="flex justify-end">
-          <Button size="sm" variant="ghost" onClick={onCancelPlaceholder}>
-            취소
-          </Button>
-        </div>
+    <Textarea
+      placeholder="내용을 입력하세요"
+      value={values.content}
+      onChange={(e) => setContent(e.target.value)}
+      disabled={!isOwner}
+      className={cn(
+        "resize-none border-none shadow-none h-full flex-1",
+        "focus-visible:border-none focus-visible:ring-0 focus-visible:bg-muted transition-colors duration-200",
+        "hover:bg-muted",
+        className
       )}
-    </div>
+    />
   );
 };

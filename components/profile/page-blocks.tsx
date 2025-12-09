@@ -105,7 +105,9 @@ export const PageBlocks = ({
   const [isMounted, setIsMounted] = useState(false);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 150, tolerance: 5 },
+    })
   );
   useEffect(() => {
     setIsMounted(true);
@@ -133,7 +135,10 @@ export const PageBlocks = ({
     [items]
   );
   const sortableBlocks = useMemo(
-    () => sortedBlocks.filter((item): item is PersistedBlock => item.kind === "persisted"),
+    () =>
+      sortedBlocks.filter(
+        (item): item is PersistedBlock => item.kind === "persisted"
+      ),
     [sortedBlocks]
   );
   const canSort = Boolean(
@@ -151,34 +156,37 @@ export const PageBlocks = ({
     const isDeleting = Boolean(blockId && deletingBlockIds?.has(blockId));
     const dragHandle =
       sortableProps && isOwner && blockId ? (
-        <button
+        <Button
+          size={"icon-sm"}
+          variant={"outline"}
           type="button"
           aria-label="블록 순서 변경"
           ref={sortableProps.setActivatorNodeRef}
           {...sortableProps.attributes}
           {...sortableProps.listeners}
-          className="absolute left-2 top-2 inline-flex items-center justify-center rounded-full border bg-white/90 p-1 text-muted-foreground shadow-sm transition hover:text-primary"
+          className="absolute -left-3 -top-3 inline-flex items-center justify-center rounded-full"
         >
           <GripVertical className="size-4" aria-hidden />
-        </button>
+        </Button>
       ) : null;
 
     return (
       <div
         className={cn(
-          "group relative rounded-lg border border-zinc-200 bg-white p-3 shadow-sm",
-          sortableProps?.isDragging ? "ring-2 ring-primary/40 shadow-lg" : ""
+          "group relative h-full rounded-2xl border bg-white p-2 shadow-xs min-h-32 flex flex-col",
+          sortableProps?.isDragging ? "border-2 shadow-md" : ""
         )}
       >
         {dragHandle}
         {isOwner && blockId ? (
           <Button
             type="button"
-            size="icon-sm"
-            variant="ghost"
-            className={`absolute right-2 top-2 rounded-full border bg-white/90 shadow-sm transition-opacity ${
+            size={"icon-sm"}
+            variant={"outline"}
+            className={cn(
+              "absolute -right-3 -top-3 rounded-full transition-opacity",
               isDeleting ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-            }`}
+            )}
             aria-label="블록 삭제"
             disabled={isDeleting}
             onClick={() => onDeleteBlock?.(blockId)}
@@ -190,12 +198,13 @@ export const PageBlocks = ({
             )}
           </Button>
         ) : null}
-        <div className="mt-3 space-y-3">
+        <div className="flex-1 space-y-3 h-full flex flex-col">
           {(() => {
             switch (type) {
               case "link":
                 return (
                   <LinkBlockEditor
+                    className="flex-1"
                     mode={isPlaceholder ? "placeholder" : "persisted"}
                     blockId={blockId}
                     handle={handle}
@@ -219,6 +228,7 @@ export const PageBlocks = ({
               case "text":
                 return (
                   <TextBlockEditor
+                    className="flex-1"
                     mode={isPlaceholder ? "placeholder" : "persisted"}
                     blockId={blockId}
                     handle={handle}
@@ -336,9 +346,7 @@ export const PageBlocks = ({
   }
 
   if (!canSort) {
-    return (
-      <section className="space-y-3 w-full">{renderGrid(false)}</section>
-    );
+    return <section className="space-y-3 w-full">{renderGrid(false)}</section>;
   }
 
   return (
