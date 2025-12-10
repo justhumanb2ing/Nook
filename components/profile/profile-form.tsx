@@ -47,7 +47,7 @@ export function ProfileForm({
   const fileInputId = useId();
   const titleRef = useRef<HTMLParagraphElement | null>(null);
   const descriptionRef = useRef<HTMLParagraphElement | null>(null);
-  const { form, preview, onSubmit } = usePageForm({
+  const { form, preview, onSubmit, handleImageChange } = usePageForm({
     pageId,
     handle,
     ownerId,
@@ -100,10 +100,7 @@ export function ProfileForm({
               accept="image/*"
               className="hidden"
               onChange={(event) =>
-                form.setValue("image", event.target.files?.[0], {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                })
+                handleImageChange(event.target.files?.[0] ?? undefined)
               }
               disabled={!isOwner}
             />

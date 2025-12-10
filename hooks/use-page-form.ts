@@ -95,6 +95,11 @@ export const usePageForm = ({
   const watchedImage = form.watch("image") as File | undefined;
   const watchedImageUrl = form.watch("imageUrl");
 
+  const markDirty = useCallback(() => {
+    wasDirtyRef.current = true;
+    setStatus("dirty");
+  }, [setStatus]);
+
   const preview = useMemo(() => {
     if (watchedImage instanceof File) {
       return URL.createObjectURL(watchedImage);
@@ -113,10 +118,28 @@ export const usePageForm = ({
   useEffect(() => {
     if (form.formState.isSubmitting || !isOwner) return;
     if (form.formState.isDirty && !wasDirtyRef.current) {
-      wasDirtyRef.current = true;
-      setStatus("dirty");
+      markDirty();
     }
-  }, [form.formState.isDirty, form.formState.isSubmitting, isOwner, setStatus]);
+  }, [
+    form.formState.isDirty,
+    form.formState.isSubmitting,
+    isOwner,
+    markDirty,
+  ]);
+
+  const handleImageChange = useCallback(
+    (file?: File) => {
+      if (!isOwner) return;
+      form.setValue("image", file, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+      if (file && !wasDirtyRef.current) {
+        markDirty();
+      }
+    },
+    [form, isOwner, markDirty]
+  );
 
   const onSubmit = useCallback(
     async (data: PageSchemaType) => {
@@ -180,5 +203,5 @@ export const usePageForm = ({
     onSubmit,
   ]);
 
-  return { form, preview, isOwner, onSubmit };
+  return { form, preview, isOwner, onSubmit, handleImageChange };
 };
