@@ -17,7 +17,6 @@ import { Item } from "@/components/ui/item";
 import { ProfileGrid } from "@/components/profile/profile-grid";
 import { PageBlockCard } from "@/components/profile/page-block-card";
 import { useProfileGridLayout } from "@/components/profile/hooks/use-profile-grid-layout";
-import { useSaveStatus } from "@/components/profile/save-status-context";
 import type { BlockType } from "@/config/block-registry";
 import type { BlockLayout } from "@/service/blocks/block-layout";
 import {
@@ -73,7 +72,6 @@ export const PageBlocks = ({
   onLayoutChange,
   disableReorder,
 }: PageBlocksProps) => {
-  const { setStatus } = useSaveStatus();
   const isEditable = isOwner && !disableReorder;
   const dragGuardHandlers = useDragGuardHandlers();
 
@@ -124,18 +122,16 @@ export const PageBlocks = ({
 
   const handleSavePlaceholder = useCallback(
     (placeholderId: string, type: BlockType, data: Record<string, unknown>) => {
-      setStatus("dirty");
       onSavePlaceholder(placeholderId, type, data);
     },
-    [onSavePlaceholder, setStatus]
+    [onSavePlaceholder]
   );
 
   const handleCancelPlaceholder = useCallback(
     (placeholderId: string) => {
       onCancelPlaceholder(placeholderId);
-      setStatus("idle");
     },
-    [onCancelPlaceholder, setStatus]
+    [onCancelPlaceholder]
   );
 
   if (!items.length) {

@@ -5,6 +5,7 @@ import {
   buildResponsiveLayouts,
   createLayoutLookup,
   extractLayoutPayload,
+  projectLayoutsToCanonicalInputs,
   type BlockLayout,
   type GridBreakpoint,
   type LayoutInput,
@@ -25,6 +26,8 @@ export const useProfileGridLayout = ({
   persistedIds,
   onCommit,
 }: UseProfileGridLayoutParams) => {
+  const [currentLayoutInputs, setCurrentLayoutInputs] =
+    useState<LayoutInput[]>(layoutInputs);
   const [layouts, setLayouts] = useState<Layouts>(() =>
     buildResponsiveLayouts(layoutInputs, { isEditable })
   );
@@ -36,12 +39,14 @@ export const useProfileGridLayout = ({
       if (!onCommit) return;
       const payload = extractLayoutPayload(nextLayouts, persistedIds);
       if (!payload.length) return;
-      onCommit(payload);
+      // 부모 상태 업데이트가 렌더 중에 발생하지 않도록 마이크로태스크로 지연
+      queueMicrotask(() => onCommit(payload));
     },
     [onCommit, persistedIds]
   );
 
   useEffect(() => {
+    setCurrentLayoutInputs(layoutInputs);
     setLayouts((previous) =>
       buildResponsiveLayouts(layoutInputs, {
         isEditable,
@@ -51,22 +56,29 @@ export const useProfileGridLayout = ({
   }, [isEditable, layoutInputs]);
 
   const normalizeAndSetLayouts = useCallback(
-    (sourceLayouts?: Layouts) => {
-      const normalized = buildResponsiveLayouts(layoutInputs, {
+    (sourceLayouts?: Layouts, nextInputs?: LayoutInput[]) => {
+      const inputs = nextInputs ?? currentLayoutInputs;
+      const existingLayouts = nextInputs ? undefined : sourceLayouts ?? layouts;
+      const normalized = buildResponsiveLayouts(inputs, {
         isEditable,
-        existingLayouts: sourceLayouts ?? layouts,
+        existingLayouts,
       });
       setLayouts(normalized);
+      setCurrentLayoutInputs(inputs);
       return normalized;
     },
-    [isEditable, layoutInputs, layouts]
+    [currentLayoutInputs, isEditable, layouts]
   );
 
   const handleLayoutChange = useCallback(
     (_currentLayout: Layout[], allLayouts: Layouts) => {
-      normalizeAndSetLayouts(allLayouts);
+      const nextInputs = projectLayoutsToCanonicalInputs(
+        allLayouts,
+        currentBreakpoint
+      );
+      normalizeAndSetLayouts(allLayouts, nextInputs);
     },
-    [normalizeAndSetLayouts]
+    [currentBreakpoint, normalizeAndSetLayouts]
   );
 
   const handleLayoutCommit = useCallback(
@@ -79,31 +91,39 @@ export const useProfileGridLayout = ({
         mergedLayouts[currentBreakpoint] = currentLayout;
       }
 
-      const normalized = normalizeAndSetLayouts(mergedLayouts);
+      const inputs = projectLayoutsToCanonicalInputs(
+        mergedLayouts ?? layouts,
+        currentBreakpoint
+      );
+      const normalized = normalizeAndSetLayouts(mergedLayouts, inputs);
       publishLayoutPayload(normalized);
     },
-    [currentBreakpoint, normalizeAndSetLayouts, publishLayoutPayload]
+    [currentBreakpoint, layouts, normalizeAndSetLayouts, publishLayoutPayload]
   );
 
   const handleResize = useCallback(
     (id: string, size: ResizeSize) => {
-      setLayouts((previous) => {
-        const nextLayouts: Layouts = { ...previous };
-        const current = previous[currentBreakpoint] ?? [];
-        const updated = current.map((entry) =>
-          entry.i === id ? { ...entry, w: size.width, h: size.height } : entry
-        );
-        nextLayouts[currentBreakpoint] = updated;
+      const nextLayouts: Layouts = { ...layouts };
+      const current = layouts[currentBreakpoint] ?? [];
+      const updated = current.map((entry) =>
+        entry.i === id ? { ...entry, w: size.width, h: size.height } : entry
+      );
+      nextLayouts[currentBreakpoint] = updated;
 
-        const normalized = buildResponsiveLayouts(layoutInputs, {
-          isEditable,
-          existingLayouts: nextLayouts,
-        });
-        publishLayoutPayload(normalized);
-        return normalized;
-      });
+      const nextInputs = projectLayoutsToCanonicalInputs(
+        nextLayouts,
+        currentBreakpoint
+      );
+      const normalized = normalizeAndSetLayouts(nextLayouts, nextInputs);
+      publishLayoutPayload(normalized);
     },
-    [currentBreakpoint, isEditable, layoutInputs, publishLayoutPayload]
+    [
+      currentBreakpoint,
+      isEditable,
+      layouts,
+      publishLayoutPayload,
+      normalizeAndSetLayouts,
+    ]
   );
 
   const handleBreakpointChange = useCallback((next: string) => {

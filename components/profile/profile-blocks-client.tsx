@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useReducer } from "react";
 import {
   useMutation,
   useQueryClient,
@@ -21,13 +21,17 @@ import type {
   PlaceholderBlock,
   ProfileBlockItem,
 } from "@/components/profile/types/block-item";
-import { toastManager } from "@/components/ui/toast";
 import { useSaveStatus } from "@/components/profile/save-status-context";
 import { blockQueryOptions } from "@/service/blocks/block-query-options";
 import { profileQueryOptions } from "@/service/profile/profile-query-options";
 import { BlockEnvProvider } from "@/hooks/use-block-env";
 import { type BlockLayout } from "@/service/blocks/block-layout";
 import { applyLayoutPatch } from "@/service/blocks/block-normalizer";
+import {
+  blockEditorReducer,
+  initialBlockEditorState,
+} from "./block-editor-reducer";
+import { useBlockEditorController } from "./block-editor-controller";
 
 type ProfileBlocksClientProps = ProfileOwnership & {
   initialBlocks: BlockWithDetails[];
@@ -44,19 +48,17 @@ export const ProfileBlocksClient = ({
   supabase,
   userId,
 }: ProfileBlocksClientProps) => {
-  const [placeholders, setPlaceholders] = useState<PlaceholderBlock[]>([]);
-  const [deletingBlockIds, setDeletingBlockIds] = useState<Set<string>>(
-    () => new Set()
+  const [state, dispatch] = useReducer(
+    blockEditorReducer,
+    initialBlockEditorState
   );
-  const layoutDebounceRef = useRef<NodeJS.Timeout | null>(null);
-  const latestLayoutRef = useRef<BlockLayout[] | null>(null);
   const queryClient = useQueryClient();
   const { setStatus } = useSaveStatus();
   const { data: profile } = useSuspenseQuery(
     profileQueryOptions.byHandle({ supabase, handle, userId })
   );
   const isOwner = profile.isOwner;
-  const persistedBlocks = profile.blocks;
+  const persistedBlocks = profile.blocks ?? initialBlocks;
   const blockEnvValue = useMemo(
     () => ({ supabase, userId }),
     [supabase, userId]
@@ -68,11 +70,6 @@ export const ProfileBlocksClient = ({
       queryClient,
       supabase,
       userId,
-      callbacks: {
-        onMutate: () => setStatus("saving"),
-        onError: () => setStatus("error"),
-        onSuccess: () => setStatus("saved"),
-      },
     })
   );
   const deleteBlockMutation = useMutation(
@@ -81,11 +78,6 @@ export const ProfileBlocksClient = ({
       queryClient,
       supabase,
       userId,
-      callbacks: {
-        onMutate: () => setStatus("saving"),
-        onError: () => setStatus("error"),
-        onSuccess: () => setStatus("saved"),
-      },
     })
   );
   const saveLayoutMutation = useMutation(
@@ -95,36 +87,30 @@ export const ProfileBlocksClient = ({
       queryClient,
       supabase,
       userId,
-      callbacks: {
-        onMutate: () => setStatus("saving"),
-        onError: () => setStatus("error"),
-        onSuccess: () => setStatus("saved"),
-      },
     })
   );
   const isSavingLayout = saveLayoutMutation.isPending;
 
+  useBlockEditorController(state, dispatch, {
+    saveLayoutMutation,
+    setStatus,
+    handle,
+    pageId,
+  });
+
   const handleAddPlaceholder = useCallback(
     (type: BlockType) => {
       if (!isOwner) return;
-      const tempId = crypto.randomUUID();
-      setPlaceholders((prev) => [
-        ...prev,
-        { kind: "placeholder", id: tempId, type },
-      ]);
-      setStatus("dirty");
+      dispatch({ type: "ADD_PLACEHOLDER", blockType: type });
     },
-    [isOwner, setStatus]
+    [dispatch, isOwner]
   );
 
   const handleCancelPlaceholder = useCallback(
     (placeholderId: string) => {
-      setPlaceholders((prev) =>
-        prev.filter((item) => item.id !== placeholderId)
-      );
-      setStatus("idle");
+      dispatch({ type: "CANCEL_PLACEHOLDER", placeholderId });
     },
-    [setStatus]
+    [dispatch]
   );
 
   const applyOptimisticLayout = useCallback(
@@ -143,88 +129,34 @@ export const ProfileBlocksClient = ({
     [handle, queryClient]
   );
 
-  const scheduleLayoutSave = useCallback(
-    (layoutPayload: BlockLayout[]) => {
-      latestLayoutRef.current = layoutPayload;
-      setStatus("dirty");
-      if (layoutDebounceRef.current) {
-        clearTimeout(layoutDebounceRef.current);
-      }
-      layoutDebounceRef.current = setTimeout(() => {
-        if (!latestLayoutRef.current) return;
-        saveLayoutMutation.mutate(
-          {
-            handle,
-            pageId,
-            blocks: latestLayoutRef.current,
-          },
-          {
-            onError: (error) => {
-              const message =
-                error instanceof Error
-                  ? error.message
-                  : "레이아웃 저장에 실패했습니다.";
-              toastManager.add({
-                title: "레이아웃 저장 실패",
-                description: message,
-                type: "error",
-              });
-            },
-          }
-        );
-      }, 300);
-    },
-    [handle, pageId, saveLayoutMutation, setStatus]
-  );
-
   const handleDeleteBlock = useCallback(
     (blockId: string) => {
-      if (!isOwner || deletingBlockIds.has(blockId)) return;
+      if (!isOwner || state.deletingBlockIds.has(blockId)) return;
 
-      setDeletingBlockIds((prev) => {
-        const next = new Set(prev);
-        next.add(blockId);
-        return next;
-      });
-      setStatus("saving");
-
-      const toastId = toastManager.add({
-        title: "블록 삭제 중…",
-        type: "loading",
-        timeout: 0,
-      });
+      dispatch({ type: "DELETE_BLOCK_START", blockId });
 
       deleteBlockMutation.mutate(
         { blockId, handle },
         {
-          onError: (error) => {
-            const message =
-              error instanceof Error
-                ? error.message
-                : "잠시 후 다시 시도해 주세요.";
-            toastManager.update(toastId, {
-              title: "블록 삭제 실패",
-              description: message,
-              type: "error",
-            });
-          },
           onSuccess: () => {
-            toastManager.update(toastId, {
-              title: "블록이 삭제되었습니다.",
-              type: "success",
-            });
+            if (state.latestLayout) {
+              dispatch({ type: "REQUEST_AUTO_SAVE" });
+            }
           },
           onSettled: () => {
-            setDeletingBlockIds((prev) => {
-              const next = new Set(prev);
-              next.delete(blockId);
-              return next;
-            });
+            dispatch({ type: "DELETE_BLOCK_FINISH", blockId });
           },
         }
       );
     },
-    [deleteBlockMutation, deletingBlockIds, handle, isOwner, setStatus]
+    [
+      deleteBlockMutation,
+      dispatch,
+      handle,
+      isOwner,
+      state.deletingBlockIds,
+      state.latestLayout,
+    ]
   );
 
   const handleLayoutChange = useCallback(
@@ -232,67 +164,60 @@ export const ProfileBlocksClient = ({
       if (!isOwner || isSavingLayout) return;
 
       applyOptimisticLayout(layoutPayload);
-      scheduleLayoutSave(layoutPayload);
-      console.log(layoutPayload);
+      dispatch({ type: "LAYOUT_CHANGED", layout: layoutPayload });
+      dispatch({ type: "REQUEST_AUTO_SAVE" });
     },
-    [applyOptimisticLayout, isOwner, isSavingLayout, scheduleLayoutSave]
+    [applyOptimisticLayout, dispatch, isOwner, isSavingLayout]
   );
 
   const handleSavePlaceholder = useCallback(
     (placeholderId: string, type: BlockType, data: Record<string, unknown>) => {
       if (!isOwner || createBlockMutation.isPending) return;
 
-      const toastId = toastManager.add({
-        title: "블록 생성 중…",
-        type: "loading",
-        timeout: 0,
-      });
-
-      const previousPlaceholders = placeholders;
-
-      setPlaceholders((prev) =>
-        prev.filter((item) => item.id !== placeholderId)
+      const placeholder = state.placeholders.find(
+        (item) => item.id === placeholderId
       );
+      dispatch({ type: "SAVE_PLACEHOLDER_START", placeholderId });
 
       createBlockMutation.mutate(
         { pageId, handle, type, data },
         {
-          onError: (error) => {
-            setPlaceholders(previousPlaceholders);
-            toastManager.update(toastId, {
-              title: "블록 생성 실패",
-              description:
-                error instanceof Error
-                  ? error.message
-                  : "잠시 후 다시 시도해 주세요.",
-              type: "error",
-            });
+          onError: () => {
+            if (placeholder) {
+              dispatch({
+                type: "ADD_PLACEHOLDER",
+                blockType: placeholder.type,
+              });
+            }
           },
           onSuccess: () => {
-            toastManager.update(toastId, {
-              title: "블록이 생성되었습니다.",
-              type: "success",
-            });
+            if (state.latestLayout) {
+              dispatch({ type: "REQUEST_AUTO_SAVE" });
+            }
           },
         }
       );
     },
-    [createBlockMutation, handle, isOwner, pageId, placeholders]
+    [
+      createBlockMutation,
+      dispatch,
+      handle,
+      isOwner,
+      pageId,
+      state.latestLayout,
+      state.placeholders,
+    ]
   );
 
   const items: ProfileBlockItem[] = [
     ...persistedBlocks.map((block) => ({ kind: "persisted" as const, block })),
-    ...placeholders,
+    ...state.placeholders.map(
+      (placeholder): PlaceholderBlock => ({
+        kind: "placeholder",
+        ...placeholder,
+      })
+    ),
   ];
-
-  useEffect(
-    () => () => {
-      if (layoutDebounceRef.current) {
-        clearTimeout(layoutDebounceRef.current);
-      }
-    },
-    []
-  );
 
   return (
     <BlockEnvProvider value={blockEnvValue}>
@@ -307,7 +232,7 @@ export const ProfileBlocksClient = ({
           onSavePlaceholder={handleSavePlaceholder}
           onCancelPlaceholder={handleCancelPlaceholder}
           onDeleteBlock={handleDeleteBlock}
-          deletingBlockIds={deletingBlockIds}
+          deletingBlockIds={state.deletingBlockIds}
           onLayoutChange={handleLayoutChange}
           disableReorder={isSavingLayout}
         />

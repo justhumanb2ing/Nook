@@ -108,7 +108,7 @@ export const pageQueryOptions = {
         options.pageId ?? "global",
       ] as const,
       meta: {
-        shouldShowToast: true,
+        shouldShowToast: false,
         toastKey: "hello!!!",
       },
       mutationFn: (variables: UpdatePageVariables) =>

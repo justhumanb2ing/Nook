@@ -162,6 +162,34 @@ export const extractLayoutPayload = (
     });
 };
 
+/**
+ * 주어진 브레이크포인트의 Layouts를 기반으로 DB 좌표계 LayoutInput으로 투영한다.
+ * - RGL 좌표(x=열, y=행)를 DB 좌표(x=행, y=열)로 재변환한다.
+ * - 저장은 canonical breakpoint 기준(col: GRID_RESPONSIVE_COLUMNS[CANONICAL_BREAKPOINT])으로 정규화한다.
+ */
+export const projectLayoutsToCanonicalInputs = (
+  layouts: Layouts,
+  sourceBreakpoint: GridBreakpoint
+): LayoutInput[] => {
+  const sourceLayout = layouts[sourceBreakpoint] ?? [];
+  const columns = GRID_RESPONSIVE_COLUMNS[CANONICAL_BREAKPOINT];
+
+  return sourceLayout.map((entry) => {
+    const width = clampSpan(entry.w, Math.min(columns, MAX_SIZE));
+    const height = clampSpan(entry.h, MAX_SIZE);
+    const maxX = Math.max(GRID_ROWS - height, 0);
+    const maxY = Math.max(columns - width, 0);
+
+    return {
+      id: entry.i,
+      x: clampCoordinate(entry.y, maxX),
+      y: clampCoordinate(entry.x, maxY),
+      w: width,
+      h: height,
+    };
+  });
+};
+
 export const sortByLayout = (layouts: BlockLayout[]): BlockLayout[] =>
   [...layouts].sort((a, b) => {
     const rowDiff = a.y - b.y;

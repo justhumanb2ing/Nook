@@ -4,14 +4,8 @@ import type { BlockWithDetails } from "@/types/block";
 import type { PageHandle, PageId, ProfileBffPayload } from "@/types/profile";
 import { getQueryClient } from "@/lib/get-query-client";
 import { profileQueryOptions } from "../profile/profile-query-options";
-import {
-  requestCreateBlock,
-  type CreateBlockParams,
-} from "./create-block";
-import {
-  requestDeleteBlock,
-  type DeleteBlockParams,
-} from "./delete-block";
+import { requestCreateBlock, type CreateBlockParams } from "./create-block";
+import { requestDeleteBlock, type DeleteBlockParams } from "./delete-block";
 import {
   requestReorderBlocks,
   type ReorderBlocksParams,
@@ -73,10 +67,7 @@ type BlockMutationOptionsArgs = {
 
 type CreateBlockVariables = Omit<CreateBlockParams, "supabase" | "userId">;
 type DeleteBlockVariables = Omit<DeleteBlockParams, "supabase" | "userId">;
-type ReorderBlocksVariables = Omit<
-  ReorderBlocksParams,
-  "supabase" | "userId"
->;
+type ReorderBlocksVariables = Omit<ReorderBlocksParams, "supabase" | "userId">;
 type UpdateBlockContentVariables = UpdateBlockContentParams;
 type SaveBlockLayoutVariables = Omit<
   SaveBlockLayoutParams,
@@ -145,9 +136,7 @@ const invalidateProfile = (
   });
 };
 
-const throwIfFailed = <
-  TResult extends { status: string; message?: string }
->(
+const throwIfFailed = <TResult extends { status: string; message?: string }>(
   result: TResult
 ): Extract<TResult, { status: "success" }> => {
   if (result.status !== "success") {
@@ -306,7 +295,12 @@ export const blockQueryOptions = {
         if ((error || !context?.previous) && context?.handle) {
           invalidateProfile(queryClient, context.handle);
         }
-        options.callbacks?.onSettled?.(undefined, error ?? null, variables, context);
+        options.callbacks?.onSettled?.(
+          undefined,
+          error ?? null,
+          variables,
+          context
+        );
       },
     }),
   reorder: (
@@ -363,7 +357,12 @@ export const blockQueryOptions = {
         if ((error || !context?.previous) && context?.handle) {
           invalidateProfile(queryClient, context.handle);
         }
-        options.callbacks?.onSettled?.(undefined, error ?? null, variables, context);
+        options.callbacks?.onSettled?.(
+          undefined,
+          error ?? null,
+          variables,
+          context
+        );
       },
     }),
   saveLayout: (
@@ -371,7 +370,12 @@ export const blockQueryOptions = {
       callbacks?: MutationLifecycleCallbacks<void, SaveBlockLayoutVariables>;
     }
   ) =>
-    mutationOptions<void, Error, SaveBlockLayoutVariables, BlockMutationContext>({
+    mutationOptions<
+      void,
+      Error,
+      SaveBlockLayoutVariables,
+      BlockMutationContext
+    >({
       mutationKey: [
         ...blockQueryKey,
         "save-layout",
@@ -420,7 +424,12 @@ export const blockQueryOptions = {
         if ((error || !context?.previous) && context?.handle) {
           invalidateProfile(queryClient, context.handle);
         }
-        options.callbacks?.onSettled?.(undefined, error ?? null, variables, context);
+        options.callbacks?.onSettled?.(
+          undefined,
+          error ?? null,
+          variables,
+          context
+        );
       },
     }),
   updateContent: (
@@ -444,7 +453,7 @@ export const blockQueryOptions = {
         options?.handle ?? "global",
       ] as const,
       meta: {
-        shouldShowToast: true,
+        shouldShowToast: false,
         toastKey: "updateContent",
       },
       mutationFn: async (variables) => {

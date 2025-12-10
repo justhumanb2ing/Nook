@@ -8,26 +8,12 @@ import { ErrorBoundary, Suspense } from "@suspensive/react";
 import { SuspenseQuery } from "@suspensive/react-query";
 import { createBrowserSupabaseClient } from "@/config/supabase-browser";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  SaveStatusProvider,
-  StatusBadge,
-  useSaveStatus,
-} from "./save-status-context";
+import { SaveStatusProvider } from "./save-status-context";
 import { ProfileForm } from "./profile-form";
 import { ProfileBlocksClient } from "./profile-blocks-client";
 
 import { SettingDropdownMenu } from "./setting-dropdownmenu";
-
-const StatusSection = () => {
-  const { status } = useSaveStatus();
-  return (
-    <div className="z-10 bg-background flex justify-end">
-      <div className="p-1 px-2 rounded-md min-w-24 text-center">
-        <StatusBadge status={status} />
-      </div>
-    </div>
-  );
-};
+import SavingStatusSection from "./saving-status-section";
 
 type ProfilePageClientProps = {
   handle: string;
@@ -67,7 +53,7 @@ export default function ProfilePageClient({
                           <section className="w-full xl:w-7xl flex flex-col gap-6 shrink">
                             {isOwner ? (
                               <div className="flex w-full justify-end">
-                                <StatusSection />
+                                <SavingStatusSection />
                               </div>
                             ) : null}
                             <div className="px-10 sm:px-16">
