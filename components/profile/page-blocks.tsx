@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type FocusEvent,
   type HTMLAttributes,
 } from "react";
 import {
@@ -34,6 +35,7 @@ import {
   LinkBlockEditor,
   TextBlockEditor,
 } from "@/components/profile/block-editors";
+import BlockSizeToolbar from "@/components/profile/block-size-toolbar";
 import { useSaveStatus } from "@/components/profile/save-status-context";
 import { cn } from "@/lib/utils";
 import {
@@ -82,6 +84,7 @@ const DRAG_CANCEL_SELECTOR =
   "input,textarea,button,a,select,option,[data-no-drag]";
 const DEFAULT_MARGIN: [number, number] = [32, 32];
 const DEFAULT_PADDING: [number, number] = [0, 0];
+const TOOLBAR_HOVER_DELAY_MS = 80;
 
 const extractLinkData = (
   block?: BlockWithDetails
@@ -370,6 +373,52 @@ export const PageBlocks = ({
     setRowHeight(computeRowHeight(containerWidth, breakpoint));
   }, [containerWidth]);
   const isEditable = isOwner && !disableReorder;
+  const hoverIntentTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const [hoveredBlockId, setHoveredBlockId] = useState<string | null>(null);
+  const clearHoverIntent = useCallback(() => {
+    if (!hoverIntentTimeoutRef.current) return;
+    clearTimeout(hoverIntentTimeoutRef.current);
+    hoverIntentTimeoutRef.current = null;
+  }, []);
+  const openHoverTarget = useCallback(
+    (blockId: string) => {
+      clearHoverIntent();
+      hoverIntentTimeoutRef.current = setTimeout(() => {
+        setHoveredBlockId(blockId);
+      }, TOOLBAR_HOVER_DELAY_MS);
+    },
+    [clearHoverIntent]
+  );
+  const closeHoverTarget = useCallback(
+    (blockId?: string) => {
+      clearHoverIntent();
+      hoverIntentTimeoutRef.current = setTimeout(() => {
+        setHoveredBlockId((current) => {
+          if (blockId && current && current !== blockId) return current;
+          return null;
+        });
+      }, TOOLBAR_HOVER_DELAY_MS);
+    },
+    [clearHoverIntent]
+  );
+  const handleBlockFocus = useCallback(
+    (blockId: string) => {
+      openHoverTarget(blockId);
+    },
+    [openHoverTarget]
+  );
+  const handleBlockBlur = useCallback(
+    (event: FocusEvent<HTMLElement>, blockId: string) => {
+      const nextTarget = event.relatedTarget;
+      if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
+        return;
+      }
+      closeHoverTarget(blockId);
+    },
+    [closeHoverTarget]
+  );
   const stopEventPropagation = useCallback(
     (event: { stopPropagation: () => void }) => {
       event.stopPropagation();
@@ -383,6 +432,12 @@ export const PageBlocks = ({
       onTouchStartCapture: stopEventPropagation,
     }),
     [stopEventPropagation]
+  );
+  useEffect(
+    () => () => {
+      clearHoverIntent();
+    },
+    [clearHoverIntent]
   );
 
   const sortedBlocks = useMemo(
@@ -429,6 +484,13 @@ export const PageBlocks = ({
     buildResponsiveLayouts(canonicalLayout, sortedBlocks, isEditable)
   );
   const layoutsRef = useRef<Layouts>(layouts);
+  const layoutById = useMemo(
+    () =>
+      new Map(
+        (layouts[currentBreakpoint] ?? []).map((entry) => [entry.i, entry])
+      ),
+    [currentBreakpoint, layouts]
+  );
 
   useEffect(() => {
     const nextLayouts = synchronizeLayouts(
@@ -489,12 +551,70 @@ export const PageBlocks = ({
     },
     [currentBreakpoint, isEditable, onLayoutChange, persistedBlockIds]
   );
+  const handleBlockSizeChange = useCallback(
+    (blockId: string, size: { width: number; height: number }) => {
+      if (!isEditable) return;
+
+      let updatedLayouts: Layouts | null = null;
+
+      setLayouts((previousLayouts) => {
+        const currentLayouts = previousLayouts[currentBreakpoint] ?? [];
+        const targetIndex = currentLayouts.findIndex(
+          (entry) => entry.i === blockId
+        );
+        if (targetIndex === -1) return previousLayouts;
+
+        const columns = GRID_RESPONSIVE_COLUMNS[currentBreakpoint];
+        const nextCurrentLayouts = currentLayouts.map((entry, index) =>
+          entry.i !== blockId
+            ? entry
+            : normalizeLayoutEntry(
+                { ...entry, w: size.width, h: size.height },
+                columns,
+                index,
+                isEditable
+              )
+        );
+
+        const draftLayouts: Layouts = {
+          ...previousLayouts,
+          [currentBreakpoint]: nextCurrentLayouts,
+        };
+
+        const canonicalFromEvent = pickCanonicalLayout(
+          draftLayouts,
+          currentBreakpoint
+        );
+        const normalized = synchronizeLayouts(
+          draftLayouts,
+          canonicalFromEvent,
+          sortedBlocks,
+          isEditable
+        );
+
+        layoutsRef.current = normalized;
+        updatedLayouts = normalized;
+        return normalized;
+      });
+
+      if (updatedLayouts) {
+        commitLayoutChange({ allLayouts: updatedLayouts });
+      }
+    },
+    [commitLayoutChange, currentBreakpoint, isEditable, sortedBlocks]
+  );
 
   const renderBlockCard = (item: BlockItem) => {
     const isPlaceholder = item.kind === "placeholder";
     const block = item.kind === "persisted" ? item.block : undefined;
     const type = item.kind === "persisted" ? item.block.type : item.type;
     const blockId = block?.id;
+    const layoutId = toLayoutId(item);
+    const layoutEntry = layoutById.get(layoutId);
+    const width = layoutEntry?.w ?? MIN_SIZE;
+    const height = layoutEntry?.h ?? MIN_SIZE;
+    const isHovered = hoveredBlockId === layoutId;
+    const showToolbar = isEditable && isHovered;
     const isDeleting = Boolean(blockId && deletingBlockIds?.has(blockId));
 
     return (
@@ -503,7 +623,37 @@ export const PageBlocks = ({
           "group relative h-full rounded-3xl border p-2 shadow-sm min-h-32 flex flex-col transition-shadow bg-background",
           isEditable ? "cursor-grab active:cursor-grabbing" : ""
         )}
+        onPointerEnter={
+          isEditable ? () => openHoverTarget(layoutId) : undefined
+        }
+        onPointerLeave={
+          isEditable ? () => closeHoverTarget(layoutId) : undefined
+        }
+        onFocusCapture={
+          isEditable ? () => handleBlockFocus(layoutId) : undefined
+        }
+        onBlurCapture={
+          isEditable
+            ? (event) => handleBlockBlur(event, layoutId)
+            : undefined
+        }
       >
+        {isEditable ? (
+          <div className="pointer-events-none absolute -bottom-5 left-1/2 -translate-x-1/2 z-10">
+            <BlockSizeToolbar
+              className="pointer-events-auto"
+              height={height}
+              onSizeChange={(nextSize) =>
+                handleBlockSizeChange(layoutId, {
+                  width: nextSize.width,
+                  height: nextSize.height,
+                })
+              }
+              visible={showToolbar}
+              width={width}
+            />
+          </div>
+        ) : null}
         {isOwner && blockId ? (
           <Button
             type="button"
@@ -663,17 +813,17 @@ export const PageBlocks = ({
             containerPadding={DEFAULT_PADDING}
             margin={DEFAULT_MARGIN}
             isDraggable={isEditable}
-          isResizable={false}
-          compactType="vertical"
-          draggableCancel={DRAG_CANCEL_SELECTOR}
-          onLayoutChange={handleLayoutChangeInternal}
-          onDragStop={(layout) =>
-            commitLayoutChange({ currentLayout: layout })
-          }
-          onResizeStop={(layout) =>
-            commitLayoutChange({ currentLayout: layout })
-          }
-        >
+            isResizable={false}
+            compactType="vertical"
+            draggableCancel={DRAG_CANCEL_SELECTOR}
+            onLayoutChange={handleLayoutChangeInternal}
+            onDragStop={(layout) =>
+              commitLayoutChange({ currentLayout: layout })
+            }
+            onResizeStop={(layout) =>
+              commitLayoutChange({ currentLayout: layout })
+            }
+          >
             {sortedBlocks.map((item) => {
               const key = item.kind === "persisted" ? item.block.id : item.id;
               return (

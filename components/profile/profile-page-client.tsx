@@ -46,22 +46,22 @@ export default function ProfilePageClient({
 
   return (
     <main className="min-h-dvh w-full px-12 lg:px-24 mx-auto flex flex-col max-w-xl container xl:max-w-none">
-      <QueryErrorResetBoundary>
-        {({ reset }) => (
-          <ErrorBoundary onReset={reset} fallback={<div>Error</div>}>
-            <Suspense fallback={<div>Loading</div>}>
-              <SuspenseQuery
-                {...profileQueryOptions.byHandle({
-                  supabase,
-                  handle,
-                  userId,
-                })}
-              >
-                {({ data: { isOwner, page, blocks } }) => {
-                  const profile = { isOwner, page };
+      <SaveStatusProvider>
+        <QueryErrorResetBoundary>
+          {({ reset }) => (
+            <ErrorBoundary onReset={reset} fallback={<div>Error</div>}>
+              <Suspense fallback={<div>Loading</div>}>
+                <SuspenseQuery
+                  {...profileQueryOptions.byHandle({
+                    supabase,
+                    handle,
+                    userId,
+                  })}
+                >
+                  {({ data: { isOwner, page, blocks } }) => {
+                    const profile = { isOwner, page };
 
-                  return (
-                    <SaveStatusProvider>
+                    return (
                       <div className="w-full flex flex-col gap-8 xl:gap-10">
                         {isOwner ? (
                           <div className="flex w-full justify-end">
@@ -101,14 +101,14 @@ export default function ProfilePageClient({
                           />
                         </aside>
                       </div>
-                    </SaveStatusProvider>
-                  );
-                }}
-              </SuspenseQuery>
-            </Suspense>
-          </ErrorBoundary>
-        )}
-      </QueryErrorResetBoundary>
+                    );
+                  }}
+                </SuspenseQuery>
+              </Suspense>
+            </ErrorBoundary>
+          )}
+        </QueryErrorResetBoundary>
+      </SaveStatusProvider>
     </main>
   );
 }
