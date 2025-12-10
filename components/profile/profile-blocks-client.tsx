@@ -298,7 +298,7 @@ export const ProfileBlocksClient = ({
 
   return (
     <BlockEnvProvider value={blockEnvValue}>
-      <div className="space-y-3 flex flex-col items-center">
+      <div className="space-y-3">
         {isOwner ? (
           <BlockRegistryPanel onSelectBlock={handleAddPlaceholder} />
         ) : null}

@@ -5,16 +5,13 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useLayoutEffect,
   useRef,
   useState,
   type FocusEvent,
   type HTMLAttributes,
 } from "react";
-import {
-  Responsive,
-  type Layout,
-  type Layouts,
-} from "react-grid-layout";
+import { Responsive, type Layout, type Layouts } from "react-grid-layout";
 import Image from "next/image";
 import Link from "next/link";
 import { Loader2, Trash2 } from "lucide-react";
@@ -77,14 +74,44 @@ type PageBlocksProps = {
   disableReorder?: boolean;
 };
 
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
 const BREAKPOINT_KEYS = Object.keys(
   GRID_RESPONSIVE_COLUMNS
 ) as GridBreakpoint[];
 const DRAG_CANCEL_SELECTOR =
   "input,textarea,button,a,select,option,[data-no-drag]";
 const DEFAULT_MARGIN: [number, number] = [32, 32];
-const DEFAULT_PADDING: [number, number] = [0, 0];
 const TOOLBAR_HOVER_DELAY_MS = 80;
+const SSR_FALLBACK_WIDTH = GRID_BREAKPOINTS[CANONICAL_BREAKPOINT];
+
+const getInitialWidth = (): number =>
+  typeof window === "undefined" ? SSR_FALLBACK_WIDTH : window.innerWidth;
+const computeGridWidth = (
+  columns: number,
+  containerWidth: number,
+  breakpoint: GridBreakpoint
+): number => {
+  if (breakpoint === "xl") return 820;
+  return containerWidth;
+};
+
+const computeContainerPadding = (
+  containerWidth: number,
+  columns: number,
+  margin: [number, number],
+  breakpoint: GridBreakpoint
+): [number, number] => {
+  if (breakpoint === "md") {
+    return [24, 0];
+  }
+
+  const [marginX] = margin;
+  const idealContentWidth = GRID_ROW_HEIGHT * columns + (columns - 1) * marginX;
+  const paddingX = Math.max(0, (containerWidth - idealContentWidth) / 2);
+  return [paddingX, 0];
+};
 
 const extractLinkData = (
   block?: BlockWithDetails
@@ -120,9 +147,7 @@ const clampCoordinate = (
 ): number => {
   const resolvedMax = Math.max(Math.floor(maxIndex), 0);
   const normalized =
-    typeof value === "number" && !Number.isNaN(value)
-      ? Math.floor(value)
-      : 0;
+    typeof value === "number" && !Number.isNaN(value) ? Math.floor(value) : 0;
   return Math.min(Math.max(normalized, 0), resolvedMax);
 };
 
@@ -232,7 +257,9 @@ const synchronizeLayouts = (
   isEditable: boolean
 ): Layouts => {
   const nextLayouts: Layouts = {};
-  const canonicalMap = new Map(canonicalLayout.map((entry) => [entry.i, entry]));
+  const canonicalMap = new Map(
+    canonicalLayout.map((entry) => [entry.i, entry])
+  );
 
   BREAKPOINT_KEYS.forEach((breakpoint) => {
     const columns = GRID_RESPONSIVE_COLUMNS[breakpoint];
@@ -263,19 +290,7 @@ const resolveBreakpoint = (width: number): GridBreakpoint => {
     (a, b) => GRID_BREAKPOINTS[b] - GRID_BREAKPOINTS[a]
   );
   const match = sorted.find((key) => width >= GRID_BREAKPOINTS[key]);
-  return match ?? "xs";
-};
-
-const computeRowHeight = (
-  width: number,
-  breakpoint: GridBreakpoint
-): number => {
-  const cols = GRID_RESPONSIVE_COLUMNS[breakpoint];
-  const [paddingX] = DEFAULT_PADDING;
-  const [marginX] = DEFAULT_MARGIN;
-  const columnWidth =
-    (width - paddingX * 2 - marginX * (cols - 1)) / cols || GRID_ROW_HEIGHT;
-  return Math.max(Math.floor(columnWidth), MIN_SIZE);
+  return match ?? "md";
 };
 
 const pickCanonicalLayout = (
@@ -302,8 +317,7 @@ const extractLayoutPayload = (
   preferredBreakpoint?: GridBreakpoint
 ): BlockLayout[] => {
   const canonicalLayout = pickCanonicalLayout(layouts, preferredBreakpoint);
-  const breakpointForPayload =
-    preferredBreakpoint ?? CANONICAL_BREAKPOINT;
+  const breakpointForPayload = preferredBreakpoint ?? CANONICAL_BREAKPOINT;
   const columnsForPayload = GRID_RESPONSIVE_COLUMNS[breakpointForPayload];
 
   return canonicalLayout
@@ -336,42 +350,80 @@ export const PageBlocks = ({
   disableReorder,
 }: PageBlocksProps) => {
   const { setStatus } = useSaveStatus();
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [containerWidth, setContainerWidth] = useState<number>(() =>
-    typeof window === "undefined" ? GRID_BREAKPOINTS.xs : window.innerWidth
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const [viewportWidth, setViewportWidth] = useState<number>(getInitialWidth);
+  const [containerWidth, setContainerWidth] = useState<number>(getInitialWidth);
+  const [currentBreakpoint, setCurrentBreakpoint] = useState<GridBreakpoint>(
+    () => resolveBreakpoint(getInitialWidth())
   );
-  const [currentBreakpoint, setCurrentBreakpoint] = useState<GridBreakpoint>(() =>
-    resolveBreakpoint(typeof window === "undefined" ? GRID_BREAKPOINTS.xs : window.innerWidth)
+  const rowHeight = GRID_ROW_HEIGHT;
+  const availableWidth = containerWidth || viewportWidth;
+  const desiredGridWidth = useMemo(
+    () =>
+      computeGridWidth(
+        GRID_RESPONSIVE_COLUMNS[currentBreakpoint],
+        availableWidth,
+        currentBreakpoint
+      ),
+    [availableWidth, currentBreakpoint]
   );
-  const [rowHeight, setRowHeight] = useState<number>(() => {
-    const initialWidth =
-      typeof window === "undefined" ? GRID_BREAKPOINTS.xs : window.innerWidth;
-    const initialBreakpoint = resolveBreakpoint(initialWidth);
-    return computeRowHeight(initialWidth, initialBreakpoint);
-  });
+  const gridWidth = useMemo(
+    () => Math.min(desiredGridWidth, availableWidth || desiredGridWidth),
+    [availableWidth, desiredGridWidth]
+  );
+  const containerPadding = useMemo(
+    () =>
+      computeContainerPadding(
+        gridWidth,
+        GRID_RESPONSIVE_COLUMNS[currentBreakpoint],
+        DEFAULT_MARGIN,
+        currentBreakpoint
+      ),
+    [currentBreakpoint, gridWidth]
+  );
 
-  useEffect(() => {
-    const node = containerRef.current;
-    if (!node || typeof ResizeObserver === "undefined") return;
+  useIsomorphicLayoutEffect(() => {
+    if (typeof window === "undefined") return;
 
     const updateWidth = () => {
+      const nextWidth = window.innerWidth;
+      if (nextWidth > 0) {
+        setViewportWidth(nextWidth);
+      }
+    };
+
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+
+    return () => window.removeEventListener("resize", updateWidth);
+  }, []);
+  useIsomorphicLayoutEffect(() => {
+    const node = scrollContainerRef.current;
+    if (!node) return;
+
+    const updateContainerWidth = () => {
       const nextWidth = node.getBoundingClientRect().width;
       if (nextWidth > 0) {
         setContainerWidth(nextWidth);
       }
     };
 
-    updateWidth();
-    const observer = new ResizeObserver(() => updateWidth());
+    updateContainerWidth();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateContainerWidth);
+      return () => window.removeEventListener("resize", updateContainerWidth);
+    }
+
+    const observer = new ResizeObserver(() => updateContainerWidth());
     observer.observe(node);
 
     return () => observer.disconnect();
   }, []);
   useEffect(() => {
-    const breakpoint = resolveBreakpoint(containerWidth);
+    const breakpoint = resolveBreakpoint(viewportWidth || availableWidth);
     setCurrentBreakpoint(breakpoint);
-    setRowHeight(computeRowHeight(containerWidth, breakpoint));
-  }, [containerWidth]);
+  }, [availableWidth, viewportWidth]);
   const isEditable = isOwner && !disableReorder;
   const hoverIntentTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
@@ -412,7 +464,10 @@ export const PageBlocks = ({
   const handleBlockBlur = useCallback(
     (event: FocusEvent<HTMLElement>, blockId: string) => {
       const nextTarget = event.relatedTarget;
-      if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
+      if (
+        nextTarget instanceof Node &&
+        event.currentTarget.contains(nextTarget)
+      ) {
         return;
       }
       closeHoverTarget(blockId);
@@ -467,9 +522,7 @@ export const PageBlocks = ({
     () =>
       new Set(
         sortedBlocks
-          .filter(
-            (item): item is PersistedBlock => item.kind === "persisted"
-          )
+          .filter((item): item is PersistedBlock => item.kind === "persisted")
           .map((item) => item.block.id)
       ),
     [sortedBlocks]
@@ -604,6 +657,8 @@ export const PageBlocks = ({
     [commitLayoutChange, currentBreakpoint, isEditable, sortedBlocks]
   );
 
+  const ResponsiveReactGridLayout = Responsive;
+
   const renderBlockCard = (item: BlockItem) => {
     const isPlaceholder = item.kind === "placeholder";
     const block = item.kind === "persisted" ? item.block : undefined;
@@ -620,7 +675,7 @@ export const PageBlocks = ({
     return (
       <div
         className={cn(
-          "group relative h-full rounded-3xl border p-2 shadow-sm min-h-32 flex flex-col transition-shadow bg-background",
+          "w-full group relative h-full rounded-3xl border p-2 shadow-sm flex flex-col transition-shadow bg-background",
           isEditable ? "cursor-grab active:cursor-grabbing" : ""
         )}
         onPointerEnter={
@@ -633,9 +688,7 @@ export const PageBlocks = ({
           isEditable ? () => handleBlockFocus(layoutId) : undefined
         }
         onBlurCapture={
-          isEditable
-            ? (event) => handleBlockBlur(event, layoutId)
-            : undefined
+          isEditable ? (event) => handleBlockBlur(event, layoutId) : undefined
         }
       >
         {isEditable ? (
@@ -801,39 +854,37 @@ export const PageBlocks = ({
 
   return (
     <section className="space-y-3 w-full">
-      <div className="flex">
-        <div ref={containerRef} className="w-full">
-          <Responsive
-            width={containerWidth}
-            className="w-full"
-            layouts={layouts}
-            breakpoints={GRID_BREAKPOINTS}
-            cols={GRID_RESPONSIVE_COLUMNS}
-            rowHeight={rowHeight}
-            containerPadding={DEFAULT_PADDING}
-            margin={DEFAULT_MARGIN}
-            isDraggable={isEditable}
-            isResizable={false}
-            compactType="vertical"
-            draggableCancel={DRAG_CANCEL_SELECTOR}
-            onLayoutChange={handleLayoutChangeInternal}
-            onDragStop={(layout) =>
-              commitLayoutChange({ currentLayout: layout })
-            }
-            onResizeStop={(layout) =>
-              commitLayoutChange({ currentLayout: layout })
-            }
-          >
-            {sortedBlocks.map((item) => {
-              const key = item.kind === "persisted" ? item.block.id : item.id;
-              return (
-                <div key={key} className="w-full h-full">
-                  {renderBlockCard(item)}
-                </div>
-              );
-            })}
-          </Responsive>
-        </div>
+      <div ref={scrollContainerRef} className="flex w-full justify-center">
+        <ResponsiveReactGridLayout
+          width={gridWidth}
+          layouts={layouts}
+          className="max-w-full"
+          style={{ width: gridWidth }}
+          breakpoints={GRID_BREAKPOINTS}
+          breakpoint={currentBreakpoint}
+          cols={GRID_RESPONSIVE_COLUMNS}
+          rowHeight={rowHeight}
+          margin={DEFAULT_MARGIN}
+          containerPadding={containerPadding}
+          isDraggable={isEditable}
+          isResizable={false}
+          compactType="vertical"
+          draggableCancel={DRAG_CANCEL_SELECTOR}
+          onLayoutChange={handleLayoutChangeInternal}
+          onDragStop={(layout) => commitLayoutChange({ currentLayout: layout })}
+          onResizeStop={(layout) =>
+            commitLayoutChange({ currentLayout: layout })
+          }
+        >
+          {sortedBlocks.map((item) => {
+            const key = item.kind === "persisted" ? item.block.id : item.id;
+            return (
+              <div key={key} className="w-full h-full">
+                {renderBlockCard(item)}
+              </div>
+            );
+          })}
+        </ResponsiveReactGridLayout>
       </div>
     </section>
   );

@@ -45,7 +45,7 @@ export default function ProfilePageClient({
   );
 
   return (
-    <main className="min-h-dvh w-full px-12 lg:px-24 mx-auto flex flex-col max-w-xl container xl:max-w-none">
+    <main className="min-h-dvh w-full flex flex-col mx-auto max-w-lg xl:max-w-none">
       <SaveStatusProvider>
         <QueryErrorResetBoundary>
           {({ reset }) => (
@@ -62,14 +62,15 @@ export default function ProfilePageClient({
                     const profile = { isOwner, page };
 
                     return (
-                      <div className="w-full flex flex-col gap-8 xl:gap-10">
+                      // <div className="w-full flex flex-col gap-8 xl:gap-12">
+                      <div>
                         {isOwner ? (
                           <div className="flex w-full justify-end">
                             <StatusSection />
                           </div>
                         ) : null}
-                        <div className="flex w-full flex-col gap-10 md:gap-12 xl:flex-row xl:items-start xl:justify-between">
-                          <div className="w-full xl:w-[40%] min-w-0 space-y-6 xl:sticky xl:top-14">
+                        <div className="max-w-lg xl:max-w-none xl:px-24 flex flex-col xl:flex-row items-start justify-between gap-8 px-8">
+                          <div className="w-full min-w-0 space-y-6 max-w-lg xl:max-w-lg shrink">
                             <ProfileForm
                               pageId={page.id}
                               handle={page.handle}
@@ -82,7 +83,7 @@ export default function ProfilePageClient({
                               userId={userId}
                             />
                           </div>
-                          <div className="w-full flex-1 min-w-0 space-y-6 xl:max-w-[60%] xl:pl-4">
+                          <div className="max-w-lg xl:max-w-none xl:w-[760px] shrink-0 transition-all duration-300 xl:mx-0">
                             <ProfileBlocksClient
                               initialBlocks={blocks}
                               handle={page.handle}

@@ -1,27 +1,21 @@
 import type { BlockWithDetails } from "@/types/block";
 
 export const GRID_BREAKPOINTS = {
-  xl: 960,
-  lg: 720,
-  md: 560,
-  sm: 360,
-  xs: 240,
+  xl: 1280,
+  md: 0,
 } as const;
 
 export const GRID_RESPONSIVE_COLUMNS = {
   xl: 4,
-  lg: 4,
-  md: 3,
-  sm: 2,
-  xs: 2,
+  md: 2,
 } as const;
 
 export type GridBreakpoint = keyof typeof GRID_BREAKPOINTS;
 
-export const CANONICAL_BREAKPOINT: GridBreakpoint = "lg";
+export const CANONICAL_BREAKPOINT: GridBreakpoint = "xl";
 export const GRID_COLUMNS = GRID_RESPONSIVE_COLUMNS[CANONICAL_BREAKPOINT];
-export const GRID_ROWS = 50;
-export const GRID_ROW_HEIGHT = 300;
+export const GRID_ROWS = 175;
+export const GRID_ROW_HEIGHT = 175;
 export const MIN_SIZE = 1;
 export const MAX_SIZE = 4;
 
@@ -75,7 +69,13 @@ const canPlace = (
   return true;
 };
 
-const occupy = (grid: OccupiedGrid, x: number, y: number, w: number, h: number) => {
+const occupy = (
+  grid: OccupiedGrid,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+) => {
   for (let row = y; row < y + h; row += 1) {
     for (let col = x; col < x + w; col += 1) {
       if (grid[row] && typeof grid[row][col] !== "undefined") {
