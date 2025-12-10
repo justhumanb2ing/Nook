@@ -22,6 +22,7 @@ import type {
   ProfileBlockItem,
 } from "@/components/profile/types/block-item";
 import { useSaveStatus } from "@/components/profile/save-status-context";
+import { BlockEditorActionsProvider } from "@/components/profile/block-editor-actions-context";
 import { blockQueryOptions } from "@/service/blocks/block-query-options";
 import { profileQueryOptions } from "@/service/profile/profile-query-options";
 import { BlockEnvProvider } from "@/hooks/use-block-env";
@@ -39,6 +40,7 @@ type ProfileBlocksClientProps = ProfileOwnership & {
   pageId: PageId;
   supabase: SupabaseClient;
   userId: string | null;
+  isOwner: boolean;
 };
 
 export const ProfileBlocksClient = ({
@@ -47,6 +49,7 @@ export const ProfileBlocksClient = ({
   pageId,
   supabase,
   userId,
+  isOwner
 }: ProfileBlocksClientProps) => {
   const [state, dispatch] = useReducer(
     blockEditorReducer,
@@ -57,7 +60,6 @@ export const ProfileBlocksClient = ({
   const { data: profile } = useSuspenseQuery(
     profileQueryOptions.byHandle({ supabase, handle, userId })
   );
-  const isOwner = profile.isOwner;
   const persistedBlocks = profile.blocks ?? initialBlocks;
   const blockEnvValue = useMemo(
     () => ({ supabase, userId }),
@@ -219,24 +221,41 @@ export const ProfileBlocksClient = ({
     ),
   ];
 
+  const blockEditorActions = useMemo(
+    () => ({
+      addPlaceholder: handleAddPlaceholder,
+      cancelPlaceholder: handleCancelPlaceholder,
+      deleteBlock: handleDeleteBlock,
+      savePlaceholder: handleSavePlaceholder,
+      layoutChange: handleLayoutChange,
+    }),
+    [
+      handleAddPlaceholder,
+      handleCancelPlaceholder,
+      handleDeleteBlock,
+      handleLayoutChange,
+      handleSavePlaceholder,
+    ]
+  );
+
   return (
-    <BlockEnvProvider value={blockEnvValue}>
-      <div className="space-y-3">
-        {isOwner ? (
-          <BlockRegistryPanel onSelectBlock={handleAddPlaceholder} />
-        ) : null}
-        <PageBlocks
-          items={items}
-          handle={handle}
-          isOwner={isOwner}
-          onSavePlaceholder={handleSavePlaceholder}
-          onCancelPlaceholder={handleCancelPlaceholder}
-          onDeleteBlock={handleDeleteBlock}
-          deletingBlockIds={state.deletingBlockIds}
-          onLayoutChange={handleLayoutChange}
-          disableReorder={isSavingLayout}
-        />
-      </div>
-    </BlockEnvProvider>
+    <BlockEditorActionsProvider value={blockEditorActions}>
+      <BlockEnvProvider value={blockEnvValue}>
+        <div className="space-y-3">
+          {isOwner ? <BlockRegistryPanel /> : null}
+          <PageBlocks
+            items={items}
+            handle={handle}
+            isOwner={isOwner}
+            onSavePlaceholder={handleSavePlaceholder}
+            onCancelPlaceholder={handleCancelPlaceholder}
+            onDeleteBlock={handleDeleteBlock}
+            deletingBlockIds={state.deletingBlockIds}
+            onLayoutChange={handleLayoutChange}
+            disableReorder={isSavingLayout}
+          />
+        </div>
+      </BlockEnvProvider>
+    </BlockEditorActionsProvider>
   );
 };

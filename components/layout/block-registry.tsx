@@ -6,8 +6,8 @@ import type { LucideIcon } from "lucide-react";
 import {
   BLOCK_REGISTRY,
   type BlockRegistryItem,
-  type BlockType,
 } from "@/config/block-registry";
+import { useBlockEditorActions } from "@/components/profile/block-editor-actions-context";
 import { Button } from "../ui/button";
 
 type IconLookup = Record<string, LucideIcon>;
@@ -28,13 +28,8 @@ const BLOCK_UI_HINT: Record<BlockRegistryKey, string> = {
   divider: "구분선이 추가됩니다.",
 };
 
-type BlockRegistryPanelProps = {
-  onSelectBlock: (type: BlockType) => void;
-};
-
-export const BlockRegistryPanel = ({
-  onSelectBlock,
-}: BlockRegistryPanelProps) => {
+export const BlockRegistryPanel = () => {
+  const { addPlaceholder } = useBlockEditorActions();
   const registryEntries = useMemo(
     () =>
       Object.entries(BLOCK_REGISTRY) as [BlockRegistryKey, BlockRegistryItem][],
@@ -54,7 +49,7 @@ export const BlockRegistryPanel = ({
                 disabled={!item.enabled}
                 aria-label={`${item.label} 블록 추가`}
                 title={BLOCK_UI_HINT[key]}
-                onClick={() => onSelectBlock(key)}
+                onClick={() => addPlaceholder(key)}
               >
                 <Icon className="h-5 w-5" />
               </Button>
