@@ -29,9 +29,6 @@ export default function SignInSection() {
                       unoptimized
                     />
                   </div>
-                  <h1 className="mt-4 text-xl font-bold tracking-tight text-neutral-950">
-                    Welcome!
-                  </h1>
                 </header>
                 <Clerk.GlobalError className="block text-sm text-red-600" />
                 <Clerk.Field name="identifier">

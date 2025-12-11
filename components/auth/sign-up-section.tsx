@@ -6,6 +6,7 @@ import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
 import { LoaderIcon } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 export default function SignUpSection() {
   return (
@@ -17,6 +18,7 @@ export default function SignUpSection() {
               name="start"
               className="w-full space-y-4 rounded-2xl px-4 py-10 sm:w-96 sm:px-8"
             >
+              {/* Logo */}
               <header className="text-left">
                 <div className="w-full">
                   <Image
@@ -28,9 +30,6 @@ export default function SignUpSection() {
                     unoptimized
                   />
                 </div>
-                <h1 className="mt-4 text-xl font-bold tracking-tight text-neutral-950">
-                  Welcome!
-                </h1>
               </header>
 
               <Clerk.GlobalError className="block text-sm text-red-600" />
@@ -164,12 +163,25 @@ export default function SignUpSection() {
                   Already have an account? Sign in
                 </Clerk.Link>
               </Button>
+
+              <footer className="text-xs text-neutral-400 text-center mt-12">
+                By clicking “Continue with Google/Email” above, you acknowledge
+                that you have read and understood, and agree to our{" "}
+                <Link href={"#"} className="underline underline-offset-1">
+                  Terms & Conditions
+                </Link>{" "}
+                and{" "}
+                <Link href={"#"} className="underline underline-offset-1">
+                  Privacy Policy
+                </Link>
+                .
+              </footer>
             </SignUp.Step>
 
             <SignUp.Step
               name="continue"
               className="w-full space-y-2 rounded-2xl px-4 py-10 sm:w-96 sm:px-8"
-            >              
+            >
               <h1 className="my-8 text-xl font-medium tracking-tight text-neutral-950">
                 Complete your profile.
               </h1>
