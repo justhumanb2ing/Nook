@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/no-non-null-asserted-optional-chain */
 import { notFound } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
-import { prefetchProfileByHandle } from "@/service/profile/profile-query-options";
-import { HydrationBoundary } from "@tanstack/react-query";
+import { profileQueryOptions } from "@/service/profile/profile-query-options";
+import { pageQueryOptions } from "@/service/pages/page-query-options";
+import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { createServerSupabaseClient } from "@/config/supabase";
 import { JsonLd } from "@/components/seo/json-ld";
+import { getQueryClient } from "@/lib/get-query-client";
 
 import ProfilePageClient from "@/components/profile/profile-page-client";
 
@@ -60,6 +62,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   const decodedHandle = decodeURIComponent(handle);
   const supabase = await createServerSupabaseClient();
   const { userId } = await auth();
+  const queryClient = getQueryClient();
 
   const fetchParams = {
     supabase,
@@ -67,7 +70,16 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     userId: userId ?? null,
   };
 
-  const { data, dehydrated } = await prefetchProfileByHandle(fetchParams);
+  const [data] = await Promise.all([
+    queryClient.fetchQuery({
+      ...profileQueryOptions.byHandle(fetchParams),
+    }),
+    queryClient.prefetchQuery({
+      ...pageQueryOptions.byOwner(userId, supabase, userId ?? null),
+    }),
+  ]);
+
+  const dehydrated = dehydrate(queryClient);
 
   if (!data) {
     notFound();

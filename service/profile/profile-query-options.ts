@@ -20,15 +20,3 @@ export const profileQueryOptions = {
       queryFn: () => fetchProfile(params) as Promise<ProfileBffPayload>,
     }),
 };
-
-export const prefetchProfileByHandle = async (params: FetchProfileParams) => {
-  const queryClient = getQueryClient();
-  const data = await queryClient.fetchQuery({
-    ...profileQueryOptions.byHandle(params),
-  });
-
-  return {
-    data,
-    dehydrated: dehydrate(queryClient),
-  };
-};
