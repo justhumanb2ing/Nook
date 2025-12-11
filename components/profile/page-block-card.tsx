@@ -87,7 +87,7 @@ export const PageBlockCard = ({
         <aside className="pointer-events-none absolute inset-x-0 -bottom-6 z-999 flex justify-center">
           <div
             data-no-drag
-            className="pointer-events-auto bg-black/80 backdrop-blur-md p-0.5 px-1 rounded-xl flex gap-1 shadow-xl border border-white/10 animate-in fade-in zoom-in duration-200 items-center"
+            className="pointer-events-auto bg-black/80 backdrop-blur-md p-1 rounded-xl flex gap-1 shadow-xl border border-white/10 animate-in fade-in zoom-in duration-200 items-center"
             onMouseDown={(event) => event.stopPropagation()}
             onTouchStart={(event) => event.stopPropagation()}
           >

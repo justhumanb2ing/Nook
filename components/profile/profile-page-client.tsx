@@ -35,7 +35,7 @@ export default function ProfilePageClient({
   return (
     <main
       id="container"
-      className="relative min-h-dvh h-dvh max-h-dvh w-full overflow-y-auto flex flex-col bg-background"
+      className="relative min-h-dvh h-dvh max-h-dvh w-full flex flex-col bg-background pt-4"
     >
       <SaveStatusProvider>
         <QueryErrorResetBoundary>
@@ -61,8 +61,8 @@ export default function ProfilePageClient({
                     const profile = { isOwner, page };
 
                     return (
-                      <div className="w-full pt-16 relative h-full">
-                        <div className="max-w-lg xl:max-w-[1600px] mx-auto flex flex-col xl:flex-row items-start justify-center gap-8 h-full px-4 md:px-6 xl:px-0">
+                      <div className="w-full relative grow">
+                        <div className="max-w-lg xl:max-w-[1600px] mx-auto flex flex-col xl:flex-row items-start justify-center gap-8 px-4 md:px-6 xl:px-0 h-full">
                           <section className="w-full xl:w-7xl flex flex-col gap-6 shrink xl:sticky xl:top-16">
                             <div className="px-10 sm:px-16 relative">
                               <ProfileForm
@@ -86,7 +86,7 @@ export default function ProfilePageClient({
                               </div>
                             </div>
                           </section>
-                          <section className="w-[420px] xl:w-[800px] shrink-0 transition-all duration-300 mx-auto xl:mx-0 grow">
+                          <section className="w-[420px] xl:w-[800px] shrink-0 transition-all duration-300 mx-auto xl:mx-0 grow xl:pt-8">
                             <ProfileBlocksClient
                               initialBlocks={blocks}
                               handle={page.handle}

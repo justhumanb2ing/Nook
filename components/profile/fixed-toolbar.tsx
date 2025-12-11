@@ -28,7 +28,7 @@ export default function FixedToolbar({
     <Toolbar
       className={cn(
         "fixed bottom-10 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 drop-shadow-sm",
-        "pointer-events-auto bg-black/80 backdrop-blur-md p-0.5 px-1 rounded-xl flex gap-1 shadow-xl border border-black animate-in fade-in zoom-in duration-200 items-center"
+        "pointer-events-auto bg-black/80 backdrop-blur-md p-1 rounded-xl flex gap-1 shadow-xl border border-black animate-in fade-in zoom-in duration-200 items-center"
       )}
     >
       <ToolbarGroup>
@@ -40,14 +40,14 @@ export default function FixedToolbar({
               key={key}
               aria-label={`${item.label} block`}
               onClick={() => addPlaceholder(key)}
-              className={"p-2 text-white"}
+              className={"p-2 text-white hover:bg-background/10 rounded-lg"}
             >
               <Icon className="h-5 w-5" />
             </ToolbarButton>
           );
         })}
       </ToolbarGroup>
-      <ToolbarSeparator className={"bg-white/20"} />
+      <ToolbarSeparator className={"hidden md:flex bg-white/20"} />
       <ToolbarButton className={"hidden md:flex min-w-24 justify-center"}>
         <SavingStatusSection />
       </ToolbarButton>

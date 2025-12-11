@@ -7,7 +7,7 @@ export default function WithHeaderLayout({
 }>) {
   return (
     <main className="relative flex flex-col xl:flex-row">
-      <aside className="p-4">Logo</aside>
+      <aside className="p-6">Logo</aside>
       <div className="grow">{children}</div>
     </main>
   );

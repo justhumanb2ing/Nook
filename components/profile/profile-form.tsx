@@ -194,7 +194,7 @@ export function ProfileForm({
                   contentEditable={isOwner}
                   suppressContentEditableWarning
                   className={cn(
-                    "w-full min-w-0 border-none rounded-none shadow-none px-2 text-zinc-900 min-h-[120px] resize-none wrap-break-word whitespace-pre-wrap",
+                    "w-full min-w-0 border-none rounded-none shadow-none px-2 text-zinc-900 min-h-[60px] resize-none wrap-break-word whitespace-pre-wrap",
                     "truncate whitespace-pre-wrap!",
                     "line-clamp-4 sm:line-clamp-6 md:line-clamp-8 focus:line-clamp-none focus:overflow-visible focus:whitespace-pre-wrap!",
                     "focus-visible:outline-none focus-visible:ring-0 text-base! xl:text-lg!",
