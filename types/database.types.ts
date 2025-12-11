@@ -336,14 +336,7 @@ export type Database = {
       }
     }
     Enums: {
-      block_type:
-        | "link"
-        | "text"
-        | "section"
-        | "image"
-        | "video"
-        | "map"
-        | "divider"
+      block_type: "link" | "text" | "image" | "map" | "section" | "divider"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -471,15 +464,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      block_type: [
-        "link",
-        "text",
-        "section",
-        "image",
-        "video",
-        "map",
-        "divider",
-      ],
+      block_type: ["link", "text", "image", "map", "section", "divider"],
     },
   },
 } as const

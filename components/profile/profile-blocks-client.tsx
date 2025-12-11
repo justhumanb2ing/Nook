@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useReducer } from "react";
+import { useCallback, useMemo, useReducer, useState } from "react";
 import {
   useMutation,
   useQueryClient,
@@ -33,6 +33,36 @@ import {
 } from "./block-editor-reducer";
 import { useBlockEditorController } from "./block-editor-controller";
 import FixedToolbar from "./fixed-toolbar";
+import { uploadPageImage } from "@/service/uploads/upload-page-image";
+import { toastManager } from "@/components/ui/toast";
+
+const readImageAspectRatio = async (
+  file: File
+): Promise<number | undefined> => {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const ratio = await new Promise<number>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => {
+        const width = image.naturalWidth || image.width;
+        const height = image.naturalHeight || image.height;
+        if (width > 0 && height > 0) {
+          resolve(width / height);
+        } else {
+          reject(new Error("이미지 크기를 확인할 수 없습니다."));
+        }
+      };
+      image.onerror = () => reject(new Error("이미지 정보를 불러오지 못했습니다."));
+      image.src = objectUrl;
+    });
+
+    return Number.isFinite(ratio) ? ratio : undefined;
+  } catch {
+    return undefined;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+};
 
 type ProfileBlocksClientProps = ProfileOwnership & {
   initialBlocks: BlockWithDetails[];
@@ -55,6 +85,7 @@ export const ProfileBlocksClient = ({
     blockEditorReducer,
     initialBlockEditorState
   );
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const queryClient = useQueryClient();
   const { setStatus } = useSaveStatus();
   const { data: profile } = useSuspenseQuery(
@@ -113,6 +144,65 @@ export const ProfileBlocksClient = ({
       dispatch({ type: "CANCEL_PLACEHOLDER", placeholderId });
     },
     [dispatch]
+  );
+
+  const handleUploadImageBlock = useCallback(
+    async (file: File) => {
+      if (!isOwner) return;
+      if (!userId) {
+        toastManager.add({
+          title: "로그인이 필요합니다.",
+          description: "이미지를 업로드하려면 로그인 후 다시 시도하세요.",
+          type: "error",
+        });
+        return;
+      }
+      if (isUploadingImage || createBlockMutation.isPending) return;
+
+      setIsUploadingImage(true);
+      setStatus("saving");
+
+      try {
+        const [imageUrl, aspectRatio] = await Promise.all([
+          uploadPageImage({ file, handle }),
+          readImageAspectRatio(file),
+        ]);
+
+        await createBlockMutation.mutateAsync({
+          pageId,
+          handle,
+          type: "image",
+          data: {
+            image_url: imageUrl,
+            aspect_ratio: aspectRatio,
+          },
+        });
+
+        setStatus("saved");
+      } catch (error) {
+        setStatus("error");
+        const message =
+          error instanceof Error
+            ? error.message
+            : "이미지 블록을 추가하지 못했습니다.";
+        toastManager.add({
+          title: "이미지 블록 추가 실패",
+          description: message,
+          type: "error",
+        });
+      } finally {
+        setIsUploadingImage(false);
+      }
+    },
+    [
+      createBlockMutation,
+      handle,
+      isOwner,
+      isUploadingImage,
+      pageId,
+      setStatus,
+      userId,
+    ]
   );
 
   const applyOptimisticLayout = useCallback(
@@ -245,6 +335,7 @@ export const ProfileBlocksClient = ({
           <FixedToolbar
             isVisible={isOwner}
             addPlaceholder={handleAddPlaceholder}
+            onUploadImage={handleUploadImageBlock}
           />
           <PageBlocks
             items={items}

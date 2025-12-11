@@ -24,13 +24,26 @@ const s3Client =
 const sanitizeHandle = (handle: string) =>
   handle.trim().replace(/^@+/, "").replace(/[^a-zA-Z0-9-_]/g, "-") || "page";
 
+const sanitizeFileName = (fileName: string) => {
+  const trimmed = fileName.trim().replace(/[/\\]/g, "");
+  const lastDotIndex = trimmed.lastIndexOf(".");
+
+  const base =
+    lastDotIndex > 0 ? trimmed.slice(0, lastDotIndex) : trimmed || "image";
+  const ext =
+    lastDotIndex > -1 ? trimmed.slice(lastDotIndex) : "";
+
+  const safeBase = base.replace(/[^a-zA-Z0-9-_]/g, "-") || "image";
+  const safeExt = /^\.[a-zA-Z0-9]+$/.test(ext) ? ext : ".bin";
+
+  return { base: safeBase, ext: safeExt };
+};
+
 const buildObjectKey = (userId: string, handle: string, fileName: string) => {
-  const ext = fileName.includes(".")
-    ? fileName.slice(fileName.lastIndexOf("."))
-    : "";
   const safeHandle = sanitizeHandle(handle);
+  const { base, ext } = sanitizeFileName(fileName || "upload");
   // 동일 키 업로드 시 R2는 기존 객체를 덮어쓴다.
-  return `page-images/${userId}/${safeHandle}${ext || ".bin"}`;
+  return `page-images/${userId}/${safeHandle}/${base}${ext}`;
 };
 
 const buildPublicUrl = (key: string) => {

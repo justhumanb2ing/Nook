@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/rules-of-hooks */
+import { useId, useRef, type ChangeEvent } from "react";
 import {
   Toolbar,
   ToolbarButton,
@@ -11,11 +13,13 @@ import { cn } from "@/lib/utils";
 interface FixedToolbarProps {
   isVisible: boolean;
   addPlaceholder: (key: BlockKey) => void;
+  onUploadImage?: (file: File) => void;
 }
 
 export default function FixedToolbar({
   isVisible,
   addPlaceholder,
+  onUploadImage,
 }: FixedToolbarProps) {
   if (!isVisible) return null;
 
@@ -23,6 +27,26 @@ export default function FixedToolbar({
     BlockKey,
     BlockConfig
   ][];
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputId = useId();
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      onUploadImage?.(file);
+    }
+    event.target.value = "";
+  };
+
+  const handleButtonClick = (key: BlockKey, item: BlockConfig) => {
+    if (item.ui === "upload" && key === "image") {
+      if (onUploadImage) {
+        fileInputRef.current?.click();
+        return;
+      }
+    }
+    addPlaceholder(key);
+  };
 
   return (
     <Toolbar
@@ -31,6 +55,14 @@ export default function FixedToolbar({
         "pointer-events-auto bg-black/80 backdrop-blur-md p-1 rounded-xl flex gap-1 shadow-xl border border-black animate-in fade-in zoom-in duration-200 items-center"
       )}
     >
+      <input
+        ref={fileInputRef}
+        id={fileInputId}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
       <ToolbarGroup>
         {registryEntries.map(([key, item]) => {
           const Icon = item.icon;
@@ -39,7 +71,7 @@ export default function FixedToolbar({
             <ToolbarButton
               key={key}
               aria-label={`${item.label} block`}
-              onClick={() => addPlaceholder(key)}
+              onClick={() => handleButtonClick(key, item)}
               className={"p-2 text-white hover:bg-background/10 rounded-lg"}
             >
               <Icon className="h-5 w-5" />

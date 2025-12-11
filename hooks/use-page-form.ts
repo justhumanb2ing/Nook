@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useSaveStatus } from "@/components/profile/save-status-context";
 import { pageQueryOptions } from "@/service/pages/page-query-options";
 import { normalizeHandle } from "@/lib/handle";
+import { uploadPageImage } from "@/service/uploads/upload-page-image";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const PageSchema = z.object({
@@ -31,28 +32,6 @@ type UsePageFormParams = {
   pageImageUrl?: string;
   supabase: SupabaseClient;
   userId: string | null;
-};
-
-const uploadImage = async (file: File, handle: string): Promise<string> => {
-  const fd = new FormData();
-  fd.set("file", file);
-  fd.set("handle", handle);
-
-  const res = await fetch("/api/uploads/page-image", {
-    method: "POST",
-    body: fd,
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body?.error ?? "이미지 업로드 실패");
-  }
-
-  const data = (await res.json()) as { url?: string };
-  if (!data.url) {
-    throw new Error("업로드 URL이 비어 있습니다.");
-  }
-  return data.url;
 };
 
 export const usePageForm = ({
@@ -148,7 +127,10 @@ export const usePageForm = ({
       try {
         let resolvedImageUrl = data.imageUrl ?? pageImageUrl ?? "";
         if (data.image instanceof File && data.image.size > 0) {
-          resolvedImageUrl = await uploadImage(data.image, normalizedHandle);
+          resolvedImageUrl = await uploadPageImage({
+            file: data.image,
+            handle: normalizedHandle,
+          });
         }
 
         const shouldUpdatePage =

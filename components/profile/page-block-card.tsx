@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, type HTMLAttributes } from "react";
 import { Loader2, XIcon } from "lucide-react";
 import type { Layout } from "react-grid-layout";
@@ -12,7 +13,11 @@ import { PageBlockResizeControls } from "@/components/profile/page-block-resize-
 import { cn } from "@/lib/utils";
 import { MIN_SIZE } from "@/service/blocks/block-layout";
 import type { ProfileBlockItem } from "./types/block-item";
-import { extractLinkData, extractTextData } from "./utils/block-content";
+import {
+  extractImageData,
+  extractLinkData,
+  extractTextData,
+} from "./utils/block-content";
 import type { BlockKey } from "@/config/block-registry";
 
 type DragGuardHandlers = Pick<
@@ -61,6 +66,7 @@ export const PageBlockCard = ({
   const height = layout?.h ?? MIN_SIZE;
   const isDeletingPersistedBlock = Boolean(blockId && isDeleting);
   const isDeletable = isPlaceholder || Boolean(blockId);
+  const isImageBlock = blockType === "image";
 
   const handleDelete = () => {
     if (isPlaceholder) {
@@ -75,7 +81,8 @@ export const PageBlockCard = ({
   return (
     <div
       className={cn(
-        "group relative h-full rounded-3xl border border-border/40 bg-background p-4 shadow-sm transition-shadow z-99999",
+        "group relative h-full rounded-3xl border border-border/40 bg-background shadow-sm transition-shadow z-99999",
+        isImageBlock ? "p-0" : "p-4",
         isEditable && "cursor-grab active:cursor-grabbing hover:shadow-lg"
       )}
       onPointerEnter={() => setIsHovered(true)}
@@ -175,15 +182,16 @@ export const PageBlockCard = ({
               );
             case "image":
               return (
-                <p className="text-xs text-muted-foreground">
-                  이미지 블록은 업로드 이후에 렌더링됩니다.
-                </p>
-              );
-            case "video":
-              return (
-                <p className="text-xs text-muted-foreground">
-                  비디오 블록은 업로드 이후에 렌더링됩니다.
-                </p>
+                <ImageBlock
+                  isOwner={isOwner}
+                  isPlaceholder={isPlaceholder}
+                  data={extractImageData(block)}
+                  onCancelPlaceholder={
+                    isPlaceholder
+                      ? () => onCancelPlaceholder(item.id)
+                      : undefined
+                  }
+                />
               );
             default:
               return (
@@ -205,6 +213,62 @@ export const PageBlockCard = ({
           }
         })()}
       </div>
+    </div>
+  );
+};
+
+type ImageBlockProps = {
+  data: {
+    imageUrl?: string | null;
+    linkUrl?: string | null;
+    aspectRatio?: number | null;
+  };
+  dragGuardHandlers?: DragGuardHandlers;
+  isOwner: boolean;
+  isPlaceholder: boolean;
+  onCancelPlaceholder?: () => void;
+};
+
+const ImageBlock = ({
+  data,
+  dragGuardHandlers,
+  isOwner,
+  isPlaceholder,
+  onCancelPlaceholder,
+}: ImageBlockProps) => {
+  const aspectRatio =
+    data.aspectRatio && data.aspectRatio > 0 ? data.aspectRatio : 4 / 3;
+
+  return (
+    <div className="flex h-full flex-col gap-2" {...dragGuardHandlers}>
+      <div
+        className="relative h-full w-full overflow-hidden border border-border/50 bg-muted rounded-3xl"
+        style={{ aspectRatio }}
+      >
+        {data.imageUrl ? (
+          <Image
+            src={data.imageUrl}
+            alt="업로드된 이미지"
+            fill
+            sizes="(min-width: 1280px) 480px, (min-width: 768px) 320px, 100vw"
+            className="object-cover w-full h-full"
+            priority={false}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+            {isOwner
+              ? "이미지를 업로드하면 여기에 표시됩니다."
+              : "이미지를 불러오지 못했습니다."}
+          </div>
+        )}
+      </div>
+      {isPlaceholder && onCancelPlaceholder ? (
+        <div className="px-4 pb-3">
+          <Button size="sm" variant="ghost" onClick={onCancelPlaceholder}>
+            취소
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 };

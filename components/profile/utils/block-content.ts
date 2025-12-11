@@ -18,3 +18,18 @@ export const extractTextData = (
     content: block.content ?? null,
   };
 };
+
+export const extractImageData = (
+  block?: BlockWithDetails
+): {
+  imageUrl?: string | null;
+  linkUrl?: string | null;
+  aspectRatio?: number | null;
+} => {
+  if (!block) return {};
+  return {
+    imageUrl: block.image_url ?? null,
+    linkUrl: block.link_url ?? null,
+    aspectRatio: block.aspect_ratio ?? null,
+  };
+};
