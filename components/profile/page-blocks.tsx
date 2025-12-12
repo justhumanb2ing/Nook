@@ -18,7 +18,7 @@ import { ProfileGrid } from "@/components/profile/profile-grid";
 import { PageBlockCard } from "@/components/profile/page-block-card";
 import { useProfileGridLayout } from "@/components/profile/hooks/use-profile-grid-layout";
 import type { BlockKey } from "@/config/block-registry";
-import type { BlockLayout } from "@/service/blocks/block-layout";
+import type { ResponsiveBlockLayout } from "@/service/blocks/block-layout";
 import {
   isPersistedBlock,
   type ProfileBlockItem,
@@ -42,7 +42,7 @@ type PageBlocksProps = {
   onCancelPlaceholder: (placeholderId: string) => void;
   onDeleteBlock?: (blockId: string) => void;
   deletingBlockIds?: Set<string>;
-  onLayoutChange?: (layout: BlockLayout[]) => void;
+  onLayoutChange?: (layout: ResponsiveBlockLayout[]) => void;
   disableReorder?: boolean;
 };
 
@@ -75,36 +75,21 @@ export default function PageBlocks ({
   const isEditable = isOwner && !disableReorder;
   const dragGuardHandlers = useDragGuardHandlers();
 
-  const sortedItems = useMemo(() => {
-    const clone = [...items];
-    return clone.sort((a, b) => {
-      if (isPersistedBlock(a) && isPersistedBlock(b)) {
-        const aOrder =
-          typeof a.block.ordering === "number" ? a.block.ordering : Number.MAX_SAFE_INTEGER;
-        const bOrder =
-          typeof b.block.ordering === "number" ? b.block.ordering : Number.MAX_SAFE_INTEGER;
-        if (aOrder !== bOrder) return aOrder - bOrder;
-        const aCreated = a.block.created_at ?? "";
-        const bCreated = b.block.created_at ?? "";
-        return aCreated.localeCompare(bCreated);
-      }
-      if (isPersistedBlock(a)) return -1;
-      if (isPersistedBlock(b)) return 1;
-      return 0;
-    });
-  }, [items]);
+  const layoutInputs = useMemo(() => toLayoutInputs(items), [items]);
+  const itemsWithIndex = useMemo(
+    () => items.map((item, index) => ({ item, index })),
+    [items]
+  );
 
   const persistedIds = useMemo(
     () =>
       new Set(
-        sortedItems
-          .filter(isPersistedBlock)
-          .map((item) => item.block.id)
+        itemsWithIndex
+          .filter(({ item }) => isPersistedBlock(item))
+          .map(({ item }) => String(item.block.id))
       ),
-    [sortedItems]
+    [itemsWithIndex]
   );
-
-  const layoutInputs = useMemo(() => toLayoutInputs(sortedItems), [sortedItems]);
 
   const {
     layouts,
@@ -119,6 +104,34 @@ export default function PageBlocks ({
     isEditable,
     onCommit: onLayoutChange,
   });
+
+  const sortedItems = useMemo(() => {
+    const clone = [...itemsWithIndex];
+    return clone
+      .sort((a, b) => {
+        const aId = isPersistedBlock(a.item)
+          ? String(a.item.block.id ?? a.index)
+          : a.item.id;
+        const bId = isPersistedBlock(b.item)
+          ? String(b.item.block.id ?? b.index)
+          : b.item.id;
+        const aLayout = aId ? layoutLookup.get(aId) : undefined;
+        const bLayout = bId ? layoutLookup.get(bId) : undefined;
+
+        if (aLayout && bLayout) {
+          const rowDiff = aLayout.y - bLayout.y;
+          if (rowDiff !== 0) return rowDiff;
+          const colDiff = aLayout.x - bLayout.x;
+          if (colDiff !== 0) return colDiff;
+          return aLayout.i.localeCompare(bLayout.i);
+        }
+
+        if (aLayout) return -1;
+        if (bLayout) return 1;
+        return 0;
+      })
+      .map((entry) => entry.item);
+  }, [itemsWithIndex, layoutLookup]);
 
   const handleSavePlaceholder = useCallback(
     (placeholderId: string, type: BlockKey, data: Record<string, unknown>) => {

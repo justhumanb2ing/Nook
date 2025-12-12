@@ -1,8 +1,8 @@
 import type { BlockKey } from "@/config/block-registry";
-import type { BlockWithDetails } from "@/types/block";
+import type { LayoutBlock } from "@/types/layout";
 
 export type PlaceholderBlock = { kind: "placeholder"; id: string; type: BlockKey };
-export type PersistedBlock = { kind: "persisted"; block: BlockWithDetails };
+export type PersistedBlock = { kind: "persisted"; block: LayoutBlock };
 
 export type ProfileBlockItem = PlaceholderBlock | PersistedBlock;
 

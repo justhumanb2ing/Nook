@@ -6,7 +6,6 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
-import type { BlockWithDetails } from "@/types/block";
 import type { BlockKey } from "@/config/block-registry";
 import type {
   PageHandle,
@@ -22,11 +21,16 @@ import type {
 } from "@/components/profile/types/block-item";
 import { useSaveStatus } from "@/components/profile/save-status-context";
 import { BlockEditorActionsProvider } from "@/components/profile/block-editor-actions-context";
-import { blockQueryOptions } from "@/service/blocks/block-query-options";
+import { layoutMutationOptions } from "@/service/layouts/layout-mutation-options";
 import { profileQueryOptions } from "@/service/profile/profile-query-options";
 import { BlockEnvProvider } from "@/hooks/use-block-env";
-import { type BlockLayout } from "@/service/blocks/block-layout";
-import { applyLayoutPatch } from "@/service/blocks/block-normalizer";
+import { type ResponsiveBlockLayout } from "@/service/blocks/block-layout";
+import {
+  applyItemsToLayoutPayload,
+  applyMetricsToLayoutItem,
+  extractLayoutItems,
+} from "@/service/layouts/page-layout-utils";
+import type { LayoutBlock } from "@/types/layout";
 import {
   blockEditorReducer,
   initialBlockEditorState,
@@ -66,7 +70,7 @@ const readImageAspectRatio = async (
 };
 
 type ProfileBlocksClientProps = ProfileOwnership & {
-  initialBlocks: BlockWithDetails[];
+  initialLayoutItems: LayoutBlock[];
   handle: PageHandle;
   pageId: PageId;
   supabase: SupabaseClient;
@@ -75,7 +79,7 @@ type ProfileBlocksClientProps = ProfileOwnership & {
 };
 
 export const ProfileBlocksClient = ({
-  initialBlocks,
+  initialLayoutItems,
   handle,
   pageId,
   supabase,
@@ -92,13 +96,19 @@ export const ProfileBlocksClient = ({
   const { data: profile } = useSuspenseQuery(
     profileQueryOptions.byHandle({ supabase, handle, userId })
   );
-  const persistedBlocks = profile.blocks ?? initialBlocks;
+  const layoutItems = useMemo(
+    () => extractLayoutItems(profile.layout ?? null),
+    [profile.layout]
+  );
+
+  const persistedItems =
+    layoutItems.length > 0 ? layoutItems : initialLayoutItems;
   const blockEnvValue = useMemo(
     () => ({ supabase, userId }),
     [supabase, userId]
   );
   const createBlockMutation = useMutation(
-    blockQueryOptions.create({
+    layoutMutationOptions.addItem({
       pageId,
       handle,
       queryClient,
@@ -107,7 +117,7 @@ export const ProfileBlocksClient = ({
     })
   );
   const deleteBlockMutation = useMutation(
-    blockQueryOptions.delete({
+    layoutMutationOptions.deleteItem({
       handle,
       queryClient,
       supabase,
@@ -115,7 +125,7 @@ export const ProfileBlocksClient = ({
     })
   );
   const saveLayoutMutation = useMutation(
-    blockQueryOptions.saveLayout({
+    layoutMutationOptions.saveLayout({
       pageId,
       handle,
       queryClient,
@@ -177,6 +187,7 @@ export const ProfileBlocksClient = ({
             image_url: imageUrl,
             aspect_ratio: aspectRatio,
           },
+          itemId: crypto.randomUUID(),
         });
 
         setStatus("saved");
@@ -207,14 +218,32 @@ export const ProfileBlocksClient = ({
   );
 
   const applyOptimisticLayout = useCallback(
-    (layoutPayload: BlockLayout[]) => {
+    (layoutPayload: ResponsiveBlockLayout[]) => {
       queryClient.setQueryData<ProfileBffPayload | undefined>(
         profileQueryOptions.byHandleKey(handle),
         (previous) => {
           if (!previous) return previous;
+          const metricMap = new Map(
+            layoutPayload.map((item) => [item.id, item])
+          );
+          const nextItems = extractLayoutItems(previous.layout ?? null).map(
+            (item) => {
+              const metric = item.id ? metricMap.get(item.id) : undefined;
+              return metric
+                ? applyMetricsToLayoutItem(item, {
+                    desktop: metric.desktop,
+                    mobile: metric.mobile,
+                  })
+                : item;
+            }
+          );
+          const nextLayout = applyItemsToLayoutPayload(
+            previous.layout ?? null,
+            nextItems
+          );
           return {
             ...previous,
-            blocks: applyLayoutPatch(previous.blocks, layoutPayload),
+            layout: nextLayout,
           };
         }
       );
@@ -229,7 +258,7 @@ export const ProfileBlocksClient = ({
       dispatch({ type: "DELETE_BLOCK_START", blockId });
 
       deleteBlockMutation.mutate(
-        { blockId, handle },
+        { itemId: blockId, pageId, handle },
         {
           onSuccess: () => {
             if (state.latestLayout) {
@@ -247,13 +276,14 @@ export const ProfileBlocksClient = ({
       dispatch,
       handle,
       isOwner,
+      pageId,
       state.deletingBlockIds,
       state.latestLayout,
     ]
   );
 
   const handleLayoutChange = useCallback(
-    (layoutPayload: BlockLayout[]) => {
+    (layoutPayload: ResponsiveBlockLayout[]) => {
       if (!isOwner || isSavingLayout) return;
 
       applyOptimisticLayout(layoutPayload);
@@ -273,7 +303,7 @@ export const ProfileBlocksClient = ({
       dispatch({ type: "SAVE_PLACEHOLDER_START", placeholderId });
 
       createBlockMutation.mutate(
-        { pageId, handle, type, data },
+        { pageId, handle, type, data, itemId: crypto.randomUUID() },
         {
           onError: () => {
             if (placeholder) {
@@ -303,7 +333,7 @@ export const ProfileBlocksClient = ({
   );
 
   const items: ProfileBlockItem[] = [
-    ...persistedBlocks.map((block) => ({ kind: "persisted" as const, block })),
+    ...persistedItems.map((block) => ({ kind: "persisted" as const, block })),
     ...state.placeholders.map(
       (placeholder): PlaceholderBlock => ({
         kind: "placeholder",
@@ -328,7 +358,6 @@ export const ProfileBlocksClient = ({
       handleSavePlaceholder,
     ]
   );
-
   return (
     <BlockEditorActionsProvider value={blockEditorActions}>
       <BlockEnvProvider value={blockEnvValue}>

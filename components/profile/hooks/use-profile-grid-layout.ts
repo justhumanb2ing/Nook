@@ -2,20 +2,23 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Layout, Layouts } from "react-grid-layout";
 import {
   CANONICAL_BREAKPOINT,
+  DESKTOP_BREAKPOINT,
+  MOBILE_BREAKPOINT,
   buildResponsiveLayouts,
   createLayoutLookup,
-  extractLayoutPayload,
-  projectLayoutsToCanonicalInputs,
-  type BlockLayout,
+  extractResponsiveLayoutPayload,
+  projectLayoutsToInputs,
   type GridBreakpoint,
   type LayoutInput,
+  type ResponsiveBlockLayout,
+  type ResponsiveLayoutInputs,
 } from "@/service/blocks/block-layout";
 
 type UseProfileGridLayoutParams = {
-  layoutInputs: LayoutInput[];
+  layoutInputs: ResponsiveLayoutInputs;
   isEditable: boolean;
   persistedIds: Set<string>;
-  onCommit?: (payload: BlockLayout[]) => void;
+  onCommit?: (payload: ResponsiveBlockLayout[]) => void;
 };
 
 type ResizeSize = { width: number; height: number };
@@ -27,7 +30,7 @@ export const useProfileGridLayout = ({
   onCommit,
 }: UseProfileGridLayoutParams) => {
   const [currentLayoutInputs, setCurrentLayoutInputs] =
-    useState<LayoutInput[]>(layoutInputs);
+    useState<ResponsiveLayoutInputs>(layoutInputs);
   const [layouts, setLayouts] = useState<Layouts>(() =>
     buildResponsiveLayouts(layoutInputs, { isEditable })
   );
@@ -39,7 +42,7 @@ export const useProfileGridLayout = ({
   const publishLayoutPayload = useCallback(
     (nextLayouts: Layouts) => {
       if (!onCommit) return;
-      const payload = extractLayoutPayload(nextLayouts, persistedIds);
+      const payload = extractResponsiveLayoutPayload(nextLayouts, persistedIds);
       if (!payload.length) return;
       // 부모 상태 업데이트가 렌더 중에 발생하지 않도록 마이크로태스크로 지연
       queueMicrotask(() => onCommit(payload));
@@ -60,7 +63,7 @@ export const useProfileGridLayout = ({
   }, [isEditable, layoutInputs]);
 
   const normalizeAndSetLayouts = useCallback(
-    (sourceLayouts?: Layouts, nextInputs?: LayoutInput[]) => {
+    (sourceLayouts?: Layouts, nextInputs?: ResponsiveLayoutInputs) => {
       const inputs = nextInputs ?? currentLayoutInputs;
       const existingLayouts = nextInputs ? undefined : sourceLayouts ?? layouts;
       const normalized = buildResponsiveLayouts(inputs, {
@@ -113,11 +116,17 @@ export const useProfileGridLayout = ({
         mergedLayouts[breakpoint] = currentLayout;
       }
 
-      const inputs = projectLayoutsToCanonicalInputs(
-        mergedLayouts ?? layouts,
-        breakpoint
-      );
-      const normalized = normalizeAndSetLayouts(mergedLayouts, inputs);
+      const nextInputs: ResponsiveLayoutInputs = {
+        [DESKTOP_BREAKPOINT]: projectLayoutsToInputs(
+          mergedLayouts ?? layouts,
+          DESKTOP_BREAKPOINT
+        ),
+        [MOBILE_BREAKPOINT]: projectLayoutsToInputs(
+          mergedLayouts ?? layouts,
+          MOBILE_BREAKPOINT
+        ),
+      };
+      const normalized = normalizeAndSetLayouts(mergedLayouts, nextInputs);
       publishLayoutPayload(normalized);
     },
     [layouts, normalizeAndSetLayouts, publishLayoutPayload]
@@ -127,16 +136,22 @@ export const useProfileGridLayout = ({
     (id: string, size: ResizeSize) => {
       const breakpoint = currentBreakpointRef.current;
       const nextLayouts: Layouts = { ...layouts };
-      const current = layouts[currentBreakpoint] ?? [];
+      const current = layouts[breakpoint] ?? [];
       const updated = current.map((entry) =>
         entry.i === id ? { ...entry, w: size.width, h: size.height } : entry
       );
       nextLayouts[breakpoint] = updated;
 
-      const nextInputs = projectLayoutsToCanonicalInputs(
-        nextLayouts,
-        breakpoint
-      );
+      const nextInputs: ResponsiveLayoutInputs = {
+        [DESKTOP_BREAKPOINT]: projectLayoutsToInputs(
+          nextLayouts,
+          DESKTOP_BREAKPOINT
+        ),
+        [MOBILE_BREAKPOINT]: projectLayoutsToInputs(
+          nextLayouts,
+          MOBILE_BREAKPOINT
+        ),
+      };
       const normalized = normalizeAndSetLayouts(nextLayouts, nextInputs);
       publishLayoutPayload(normalized);
     },

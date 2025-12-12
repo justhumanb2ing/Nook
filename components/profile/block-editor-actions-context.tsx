@@ -2,7 +2,9 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import type { BlockKey } from "@/config/block-registry";
-import type { BlockLayout } from "@/service/blocks/block-layout";
+import type {
+  ResponsiveBlockLayout,
+} from "@/service/blocks/block-layout";
 
 export type BlockEditorActions = {
   addPlaceholder: (type: BlockKey) => void;
@@ -13,7 +15,7 @@ export type BlockEditorActions = {
     type: BlockKey,
     data: Record<string, unknown>
   ) => void;
-  layoutChange: (layout: BlockLayout[]) => void;
+  layoutChange: (layout: ResponsiveBlockLayout[]) => void;
 };
 
 const BlockEditorActionsContext = createContext<BlockEditorActions | null>(

@@ -16,6 +16,7 @@ import { SettingDropdownMenu } from "./setting-dropdownmenu";
 import { pageQueryOptions } from "@/service/pages/page-query-options";
 import { cn } from "@/lib/utils";
 import SettingMobileSheet from "./setting-mobile-sheet";
+import { extractLayoutItems } from "@/service/layouts/page-layout-utils";
 
 type ProfilePageClientProps = {
   handle: string;
@@ -54,11 +55,14 @@ export default function ProfilePageClient({
                 >
                   {([
                     {
-                      data: { isOwner, page, blocks },
+                      data: { isOwner, page, layout },
                     },
                     { data: pages },
                   ]) => {
                     const profile = { isOwner, page };
+                    const initialLayoutItems = extractLayoutItems(
+                      layout ?? null
+                    );
 
                     return (
                       <div className="w-full relative grow">
@@ -88,7 +92,7 @@ export default function ProfilePageClient({
                           </section>
                           <section className="w-[420px] xl:w-[800px] shrink-0 transition-all duration-300 mx-auto xl:mx-0 grow xl:pt-8">
                             <ProfileBlocksClient
-                              initialBlocks={blocks}
+                              initialLayoutItems={initialLayoutItems}
                               handle={page.handle}
                               pageId={page.id}
                               isOwner={isOwner}

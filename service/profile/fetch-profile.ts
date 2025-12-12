@@ -2,12 +2,8 @@ import * as Sentry from "@sentry/nextjs";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Tables } from "@/types/database.types";
 import type { ProfileBffPayload } from "@/types/profile";
+import type { PageLayout } from "@/types/layout";
 import { buildHandleCandidates } from "./build-handle-candidates";
-import { normalizeBlocks } from "@/service/blocks/block-normalizer";
-import {
-  extractLayoutBlocks,
-  toNormalizableBlocks,
-} from "@/lib/layout-block-parser";
 
 type PageRecord = Pick<
   Tables<"pages">,
@@ -66,14 +62,10 @@ export const fetchProfile = async (
 
         if (layoutError) throw layoutError;
 
-        const normalizedBlocks = normalizeBlocks(
-          toNormalizableBlocks(extractLayoutBlocks(layouts))
-        );
-
         return {
           page,
           isOwner: Boolean(userId && userId === page.owner_id),
-          blocks: normalizedBlocks,
+          layout: (layouts as PageLayout) ?? null,
         };
       }
     );

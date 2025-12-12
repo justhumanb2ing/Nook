@@ -1,5 +1,5 @@
 import type { Tables } from "@/types/database.types";
-import type { BlockWithDetails } from "./block";
+import type { PageLayout } from "./layout";
 
 export type PageId = Tables<"pages">["id"];
 export type PageHandle = Tables<"pages">["handle"];
@@ -19,5 +19,5 @@ export type ProfileOwnership = { isOwner: boolean };
 
 export type ProfileBffPayload = ProfileOwnership & {
   page: PagePayload;
-  blocks: BlockWithDetails[];
+  layout: PageLayout;
 };

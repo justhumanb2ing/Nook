@@ -2,7 +2,10 @@ import { useEffect } from "react";
 import type { Dispatch } from "react";
 import type { UseMutationResult } from "@tanstack/react-query";
 import type { PageHandle, PageId } from "@/types/profile";
-import type { BlockLayout } from "@/service/blocks/block-layout";
+import type {
+  LayoutMutationContext,
+  SaveLayoutVariables,
+} from "@/service/layouts/layout-mutation-options";
 import { toastManager } from "@/components/ui/toast";
 import type { SaveStatus } from "@/components/profile/save-status-context";
 import type {
@@ -10,14 +13,13 @@ import type {
   BlockEditorState,
 } from "./block-editor-reducer";
 
-type SaveLayoutVariables = {
-  blocks: BlockLayout[];
-  handle: PageHandle;
-  pageId: PageId;
-};
-
 type BlockEditorControllerDeps = {
-  saveLayoutMutation: UseMutationResult<void, Error, SaveLayoutVariables>;
+  saveLayoutMutation: UseMutationResult<
+    void,
+    Error,
+    SaveLayoutVariables,
+    LayoutMutationContext
+  >;
   setStatus: (status: SaveStatus) => void;
   handle: PageHandle;
   pageId: PageId;
@@ -66,7 +68,7 @@ export const useBlockEditorController = (
 
       saveLayoutMutation.mutate(
         {
-          blocks: state.latestLayout ?? [],
+          layouts: state.latestLayout ?? [],
           handle,
           pageId,
         },

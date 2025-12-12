@@ -1,5 +1,4 @@
 import type { Layout, Layouts } from "react-grid-layout";
-import type { BlockWithDetails } from "@/types/block";
 
 export const GRID_BREAKPOINTS = {
   lg: 700,
@@ -20,8 +19,21 @@ export const GRID_ROW_HEIGHT = 175;
 export const GRID_MARGIN: [number, number] = [26, 26];
 export const MIN_SIZE = 1;
 export const MAX_SIZE = GRID_COLUMNS;
+export const LAYOUT_SIZE_SCALE = 2;
+export const DESKTOP_BREAKPOINT: GridBreakpoint = "lg";
+export const MOBILE_BREAKPOINT: GridBreakpoint = "xxs";
 
-export type LayoutInput = Pick<BlockWithDetails, "id" | "x" | "y" | "w" | "h">;
+export type LayoutInput = {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
+export type ResponsiveLayoutInputs = Partial<
+  Record<GridBreakpoint, LayoutInput[]>
+>;
 
 export type BlockLayout = {
   id: string;
@@ -29,6 +41,14 @@ export type BlockLayout = {
   y: number;
   w: number;
   h: number;
+};
+
+export type ViewportLayout = Omit<BlockLayout, "id">;
+
+export type ResponsiveBlockLayout = {
+  id: string;
+  desktop: ViewportLayout;
+  mobile: ViewportLayout;
 };
 
 type LayoutSource =
@@ -106,7 +126,7 @@ const normalizeLayoutEntry = (
  * - 기존 Layout이 있으면 우선 사용하고, 없으면 Block 좌표(x=행, y=열)를 RGL 좌표(x=열, y=행)로 스왑한다.
  */
 export const buildResponsiveLayouts = (
-  items: LayoutInput[],
+  inputs: ResponsiveLayoutInputs,
   options?: { existingLayouts?: Layouts; isEditable?: boolean }
 ): Layouts => {
   const isEditable = options?.isEditable ?? false;
@@ -117,8 +137,10 @@ export const buildResponsiveLayouts = (
     const columns = GRID_RESPONSIVE_COLUMNS[breakpoint];
     const existing = existingLayouts[breakpoint] ?? [];
     const existingMap = new Map(existing.map((entry) => [entry.i, entry]));
+    const breakpointInputs =
+      inputs[breakpoint] ?? inputs[CANONICAL_BREAKPOINT] ?? [];
 
-    nextLayouts[breakpoint] = items.map((item, index) => {
+    nextLayouts[breakpoint] = breakpointInputs.map((item, index) => {
       const fallback = existingMap.get(item.id) ?? item;
       return normalizeLayoutEntry(fallback, columns, index, isEditable);
     });
@@ -137,29 +159,57 @@ export const createLayoutLookup = (
  * RGL Layouts를 서버로 전송할 BlockLayout payload로 변환한다.
  * - DB는 x=행, y=열을 사용하므로 RGL 좌표(x=열, y=행)를 반대로 매핑한다.
  */
-export const extractLayoutPayload = (
+export const extractResponsiveLayoutPayload = (
   layouts: Layouts,
   persistedIds: Set<string>
-): BlockLayout[] => {
-  const canonicalLayout = layouts[CANONICAL_BREAKPOINT] ?? [];
-  const columns = GRID_RESPONSIVE_COLUMNS[CANONICAL_BREAKPOINT];
+): ResponsiveBlockLayout[] => {
+  const desktopLayout = layouts[DESKTOP_BREAKPOINT] ?? [];
+  const mobileLayout = layouts[MOBILE_BREAKPOINT] ?? [];
+  const desktopColumns = GRID_RESPONSIVE_COLUMNS[DESKTOP_BREAKPOINT];
+  const mobileColumns = GRID_RESPONSIVE_COLUMNS[MOBILE_BREAKPOINT];
 
-  return canonicalLayout
-    .filter((item) => persistedIds.has(item.i))
-    .map((item) => {
-      const width = clampSpan(item.w, Math.min(columns, MAX_SIZE));
-      const height = clampSpan(item.h, MAX_SIZE);
-      const maxX = Math.max(GRID_ROWS - height, 0);
-      const maxY = Math.max(columns - width, 0);
+  const normalizeEntry = (
+    entry: Layout,
+    columns: number
+  ): ViewportLayout => {
+    const width = clampSpan(entry.w, Math.min(columns, MAX_SIZE));
+    const height = clampSpan(entry.h, MAX_SIZE);
+    const maxX = Math.max(GRID_ROWS - height, 0);
+    const maxY = Math.max(columns - width, 0);
 
-      return {
-        id: item.i,
-        x: clampCoordinate(item.y, maxX),
-        y: clampCoordinate(item.x, maxY),
-        w: width,
-        h: height,
-      };
-    });
+    return {
+      x: clampCoordinate(entry.y, maxX),
+      y: clampCoordinate(entry.x, maxY),
+      w: width,
+      h: height,
+    };
+  };
+
+  const desktopMap = new Map(
+    desktopLayout
+      .filter((item) => persistedIds.has(item.i))
+      .map((item) => [item.i, normalizeEntry(item, desktopColumns)])
+  );
+  const mobileMap = new Map(
+    mobileLayout
+      .filter((item) => persistedIds.has(item.i))
+      .map((item) => [item.i, normalizeEntry(item, mobileColumns)])
+  );
+
+  return Array.from(persistedIds).map((id) => {
+    const desktop = desktopMap.get(id) ?? {
+      x: 0,
+      y: 0,
+      w: MIN_SIZE,
+      h: MIN_SIZE,
+    };
+    const mobile = mobileMap.get(id) ?? desktop;
+    return {
+      id,
+      desktop,
+      mobile,
+    };
+  });
 };
 
 /**
@@ -167,12 +217,12 @@ export const extractLayoutPayload = (
  * - RGL 좌표(x=열, y=행)를 DB 좌표(x=행, y=열)로 재변환한다.
  * - 저장은 canonical breakpoint 기준(col: GRID_RESPONSIVE_COLUMNS[CANONICAL_BREAKPOINT])으로 정규화한다.
  */
-export const projectLayoutsToCanonicalInputs = (
+export const projectLayoutsToInputs = (
   layouts: Layouts,
-  sourceBreakpoint: GridBreakpoint
+  breakpoint: GridBreakpoint
 ): LayoutInput[] => {
-  const sourceLayout = layouts[sourceBreakpoint] ?? [];
-  const columns = GRID_RESPONSIVE_COLUMNS[CANONICAL_BREAKPOINT];
+  const sourceLayout = layouts[breakpoint] ?? [];
+  const columns = GRID_RESPONSIVE_COLUMNS[breakpoint];
 
   return sourceLayout.map((entry) => {
     const width = clampSpan(entry.w, Math.min(columns, MAX_SIZE));

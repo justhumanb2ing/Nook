@@ -1,5 +1,4 @@
-import { dehydrate, queryOptions } from "@tanstack/react-query";
-import { getQueryClient } from "@/lib/get-query-client";
+import { queryOptions } from "@tanstack/react-query";
 import { fetchProfile, type FetchProfileParams } from "./fetch-profile";
 import type { ProfileBffPayload } from "@/types/profile";
 

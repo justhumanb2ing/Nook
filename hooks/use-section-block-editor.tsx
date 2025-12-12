@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { blockQueryOptions } from "@/service/blocks/block-query-options";
+import { layoutMutationOptions } from "@/service/layouts/layout-mutation-options";
 import { useDebouncedMutation } from "./use-debounced-mutation";
 import { useBlockEnv } from "./use-block-env";
 import type {
@@ -14,7 +14,7 @@ export const useSectionBlockEditor = (params: SectionBlockParams) => {
     title: params.data.title ?? "",
   });
   const updateBlockMutation = useMutation(
-    blockQueryOptions.updateContent({ supabase, userId })
+    layoutMutationOptions.updateContent({ supabase, userId })
   );
 
   const getValues = useMemo(

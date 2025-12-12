@@ -187,12 +187,13 @@ export const createOptimisticBlock = (
     type: BlockKey;
     data: Record<string, unknown>;
     currentLength: number;
+    id?: string;
   }
 ): BlockWithDetails => {
   const defaultLayout = getDefaultBlockLayout(params.type);
 
   return {
-    id: crypto.randomUUID(),
+    id: params.id ?? crypto.randomUUID(),
     type: params.type,
     ordering: params.currentLength,
     created_at: new Date().toISOString(),

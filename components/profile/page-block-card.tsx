@@ -12,7 +12,7 @@ import {
 } from "@/components/profile/block-editors";
 import { PageBlockResizeControls } from "@/components/profile/page-block-resize-controls";
 import { cn } from "@/lib/utils";
-import { MIN_SIZE } from "@/service/blocks/block-layout";
+import { LAYOUT_SIZE_SCALE, MIN_SIZE } from "@/service/blocks/block-layout";
 import { getDefaultBlockLayout } from "@/service/blocks/block-layout-presets";
 import type { ProfileBlockItem } from "./types/block-item";
 import {
@@ -68,8 +68,16 @@ export const PageBlockCard = ({
   const defaultLayout = blockType
     ? getDefaultBlockLayout(blockType)
     : { w: MIN_SIZE, h: MIN_SIZE };
-  const width = layout?.w ?? defaultLayout.w;
-  const height = layout?.h ?? defaultLayout.h;
+  const defaultWidth = Math.max(
+    Math.ceil(defaultLayout.w / LAYOUT_SIZE_SCALE),
+    MIN_SIZE
+  );
+  const defaultHeight = Math.max(
+    Math.ceil(defaultLayout.h / LAYOUT_SIZE_SCALE),
+    MIN_SIZE
+  );
+  const width = layout?.w ?? defaultWidth;
+  const height = layout?.h ?? defaultHeight;
   const isDeletingPersistedBlock = Boolean(blockId && isDeleting);
   const isDeletable = isPlaceholder || Boolean(blockId);
   const isImageBlock = blockType === "image";

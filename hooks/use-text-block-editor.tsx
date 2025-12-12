@@ -1,4 +1,4 @@
-import { blockQueryOptions } from "@/service/blocks/block-query-options";
+import { layoutMutationOptions } from "@/service/layouts/layout-mutation-options";
 import { useMemo, useState } from "react";
 import { useDebouncedMutation } from "./use-debounced-mutation";
 import { useMutation } from "@tanstack/react-query";
@@ -14,7 +14,7 @@ export const useTextBlockEditor = (params: TextBlockParams) => {
     content: params.data.content ?? "",
   });
   const updateBlockMutation = useMutation(
-    blockQueryOptions.updateContent({ supabase, userId })
+    layoutMutationOptions.updateContent({ supabase, userId })
   );
   const getValues = useMemo(
     () => () => ({ content: values.content.trim() }),

@@ -1,7 +1,7 @@
 # TanStack Query 도메인 옵션
 
 - 공통 QueryClient: `lib/get-query-client.ts`의 `getQueryClient()`를 사용한다. 서버/클라이언트 동일 옵션(`queries.retry=1`, `mutations.retry=0`, `staleTime=60s`). `queryOptions`/`mutationOptions`는 `@tanstack/react-query`에서 import.
-- Block: `service/blocks/block-query-options.ts`에서 `create`, `delete`, `reorder`, `updateContent` mutation 키를 `["block", ...]`로 통합 관리하며, `profile.byHandle` 캐시를 `setQueryData`로 낙관적 반영하고 실패 시에만 invalidate한다.
+- Layout: `service/layouts/layout-mutation-options.ts`에서 `addItem`, `deleteItem`, `reorderItems`, `saveLayout`, `updateContent` mutation 키를 `["layout", ...]`로 통합 관리하며, `profile.byHandle` 캐시의 `layout`을 갱신하고 실패 시에만 invalidate한다.
 - Page: `service/pages/page-query-options.ts`에서 소유자별 목록(`byOwner`), 업데이트(`update`), 핸들 변경(`changeHandle`), 공개 상태 토글(`toggleVisibility`)을 `["page", ...]` 키로 제공하며, Supabase Client와 userId를 호출자에서 주입한다. 공개 상태 토글은 `profile` 캐시에 낙관적 업데이트를 적용한 뒤 쿼리를 무효화해 일관성을 유지한다.
 - Profile: `service/profile/profile-query-options.ts`에서 Supabase 기반 조회를 `["profile", "handle", handle]` 키로 관리하며, 서버/클라이언트 모두 동일한 `fetchProfile` 호출 경로를 사용한다.
 
@@ -28,18 +28,18 @@ const updateResult = await queryClient.executeMutation({
 ## 클라이언트 사용 예시
 ```tsx
 import { useMutation } from "@tanstack/react-query";
-import { blockQueryOptions } from "@/service/blocks/block-query-options";
+import { layoutMutationOptions } from "@/service/layouts/layout-mutation-options";
 import { createBrowserSupabaseClient } from "@/config/supabase-browser";
 import { useAuth } from "@clerk/nextjs";
 
 const { getToken, userId } = useAuth();
 const supabase = createBrowserSupabaseClient(() => getToken());
 
-const createBlock = useMutation(
-  blockQueryOptions.create({ pageId, handle, supabase, userId })
+const addLayoutItem = useMutation(
+  layoutMutationOptions.addItem({ pageId, handle, supabase, userId })
 );
 
-createBlock.mutate(
+addLayoutItem.mutate(
   { pageId, handle, type, data },
   {
     onSuccess: () => {

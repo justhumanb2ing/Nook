@@ -1,10 +1,10 @@
 import type { BlockKey } from "@/config/block-registry";
-import type { BlockLayout } from "@/service/blocks/block-layout";
+import type { ResponsiveBlockLayout } from "@/service/blocks/block-layout";
 
 export type BlockEditorState = {
   placeholders: { id: string; type: BlockKey }[];
   deletingBlockIds: Set<string>;
-  latestLayout: BlockLayout[] | null;
+  latestLayout: ResponsiveBlockLayout[] | null;
   saveState: "idle" | "dirty" | "saving" | "saved" | "error";
   pendingAutoSave: boolean;
 };
@@ -15,7 +15,7 @@ export type BlockEditorAction =
   | { type: "DELETE_BLOCK_START"; blockId: string }
   | { type: "DELETE_BLOCK_FINISH"; blockId: string }
   | { type: "SAVE_PLACEHOLDER_START"; placeholderId: string }
-  | { type: "LAYOUT_CHANGED"; layout: BlockLayout[] }
+  | { type: "LAYOUT_CHANGED"; layout: ResponsiveBlockLayout[] }
   | { type: "MARK_DIRTY" }
   | { type: "AUTO_SAVE_START" }
   | { type: "AUTO_SAVE_SUCCESS" }
