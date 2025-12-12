@@ -26,7 +26,7 @@ export default function OnboardingSection() {
       // Reloads the user's data from the Clerk API
       await user?.reload();
       // 홈으로 이동
-      router.push(`/profile/@${res.handle}`);
+      router.push(`/profile/${res.handle}`);
     }
 
     if (res?.error) {

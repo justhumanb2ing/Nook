@@ -4,6 +4,10 @@ import type { Tables } from "@/types/database.types";
 import type { ProfileBffPayload } from "@/types/profile";
 import { buildHandleCandidates } from "./build-handle-candidates";
 import { normalizeBlocks } from "@/service/blocks/block-normalizer";
+import {
+  extractLayoutBlocks,
+  toNormalizableBlocks,
+} from "@/lib/layout-block-parser";
 
 type PageRecord = Pick<
   Tables<"pages">,
@@ -15,8 +19,6 @@ type PageRecord = Pick<
   | "owner_id"
   | "is_public"
 >;
-
-type BlocksPayload = ProfileBffPayload["blocks"];
 
 export type FetchProfileParams = {
   supabase: SupabaseClient;
@@ -49,24 +51,29 @@ export const fetchProfile = async (
             "id, handle, title, description, image_url, owner_id, is_public"
           )
           .in("handle", handleCandidates)
-          .order("ordering", { ascending: true, nullsFirst: true })
           .order("created_at", { ascending: true })
           .maybeSingle<PageRecord>();
 
         if (pageError) throw pageError;
         if (!page) return null;
 
-        const { data: blocks, error: blockError } = await supabase.rpc(
-          "get_blocks_with_details",
-          { p_page_id: page.id }
+        const { data: layouts, error: layoutError } = await supabase.rpc(
+          "get_page_layout",
+          {
+            p_page_id: page.id,
+          }
         );
 
-        if (blockError) throw blockError;
+        if (layoutError) throw layoutError;
+
+        const normalizedBlocks = normalizeBlocks(
+          toNormalizableBlocks(extractLayoutBlocks(layouts))
+        );
 
         return {
           page,
           isOwner: Boolean(userId && userId === page.owner_id),
-          blocks: normalizeBlocks((blocks ?? []) as BlocksPayload),
+          blocks: normalizedBlocks,
         };
       }
     );

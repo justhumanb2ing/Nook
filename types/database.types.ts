@@ -226,6 +226,38 @@ export type Database = {
           },
         ]
       }
+      page_layouts: {
+        Row: {
+          created_at: string
+          layout: Json
+          page_id: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          created_at?: string
+          layout: Json
+          page_id: string
+          updated_at?: string
+          version?: string
+        }
+        Update: {
+          created_at?: string
+          layout?: Json
+          page_id?: string
+          updated_at?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "page_layouts_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: true
+            referencedRelation: "pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pages: {
         Row: {
           created_at: string | null
@@ -234,7 +266,6 @@ export type Database = {
           id: string
           image_url: string | null
           is_public: boolean | null
-          ordering: number | null
           owner_id: string
           title: string | null
         }
@@ -245,7 +276,6 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_public?: boolean | null
-          ordering?: number | null
           owner_id: string
           title?: string | null
         }
@@ -256,7 +286,6 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_public?: boolean | null
-          ordering?: number | null
           owner_id?: string
           title?: string | null
         }
@@ -308,6 +337,7 @@ export type Database = {
       }
       get_block_types: { Args: never; Returns: string[] }
       get_blocks_with_details: { Args: { p_page_id: string }; Returns: Json }
+      get_page_layout: { Args: { p_page_id: string }; Returns: Json }
       get_primary_page: { Args: { p_owner_id: string }; Returns: Json }
       reorder_blocks_after_dnd: {
         Args: { p_blocks: Json; p_page_id: string }
@@ -326,7 +356,6 @@ export type Database = {
           id: string
           image_url: string | null
           is_public: boolean | null
-          ordering: number | null
           owner_id: string
           title: string | null
         }
@@ -336,6 +365,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      update_page_layout: {
+        Args: { p_layout: Json; p_page_id: string }
+        Returns: undefined
       }
     }
     Enums: {

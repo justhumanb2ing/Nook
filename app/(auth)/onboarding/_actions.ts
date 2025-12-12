@@ -42,7 +42,6 @@ export const completeOnboarding = async (formData: FormData) => {
     handle: storedHandle,
     title: `${rawInput}'s Space`, // uses clean raw input without @
     is_public: true,
-    ordering: 0,
   });
 
   if (insertError) {
