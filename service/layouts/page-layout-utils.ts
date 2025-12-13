@@ -145,7 +145,8 @@ const mergeStyle = (
     mobileSize.h * LAYOUT_SIZE_SCALE
   );
   return {
-    mobile: style?.mobile ?? mobile,
+    // 모바일 사이즈도 항상 최신 입력값을 반영한다.
+    mobile,
     desktop,
   };
 };
