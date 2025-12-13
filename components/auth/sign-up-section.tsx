@@ -5,8 +5,8 @@ import * as SignUp from "@clerk/elements/sign-up";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
 import { LoaderIcon } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
+import Logo from "../layout/logo";
 
 export default function SignUpSection() {
   return (
@@ -19,17 +19,8 @@ export default function SignUpSection() {
               className="w-full space-y-4 rounded-2xl px-4 py-10 sm:w-96 sm:px-8"
             >
               {/* Logo */}
-              <header className="text-left">
-                <div className="w-full">
-                  <Image
-                    src={"/logo-title.png"}
-                    alt="logo"
-                    width={300}
-                    height={100}
-                    className="object-cover w-full h-full"
-                    unoptimized
-                  />
-                </div>
+              <header className="text-left flex justify-center">
+                <Logo />
               </header>
 
               <Clerk.GlobalError className="block text-sm text-red-600" />
@@ -231,17 +222,8 @@ export default function SignUpSection() {
               className="w-full space-y-6 rounded-2xl px-4 py-10 sm:w-96 sm:px-8"
             >
               <SignUp.Strategy name="email_code">
-                <header className="text-center">
-                  <div className="w-full">
-                    <Image
-                      src={"/logo-title.png"}
-                      alt="logo"
-                      width={300}
-                      height={100}
-                      className="object-cover w-full h-full"
-                      unoptimized
-                    />
-                  </div>
+                <header className="text-center flex flex-col items-center">
+                  <Logo />
                   <h1 className="mt-4 text-xl font-medium tracking-tight text-neutral-950">
                     Verify your email
                   </h1>

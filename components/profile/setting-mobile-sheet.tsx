@@ -64,14 +64,6 @@ export default function SettingMobileSheet({
 
   return (
     <Drawer
-    // onOpenChange={(open) => {
-    //   if (!open) {
-    //     void funnel.history.replace("SettingList", (prev) => ({
-    //       ...prev,
-    //       handle: page.handle,
-    //     }));
-    //   }
-    // }}
     >
       <DrawerTrigger asChild>
         <Button variant="outline" size={"icon-sm"} className="">

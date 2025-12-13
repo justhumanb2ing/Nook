@@ -5,7 +5,7 @@ import * as SignIn from "@clerk/elements/sign-in";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
 import { LoaderIcon } from "lucide-react";
-import Image from "next/image";
+import Logo from "../layout/logo";
 
 export default function SignInSection() {
   return (
@@ -18,17 +18,8 @@ export default function SignInSection() {
                 name="start"
                 className="w-full space-y-4 rounded-2xl px-4 py-10 sm:w-96 sm:px-8"
               >
-                <header className="text-left mb-6">
-                  <div className="w-full">
-                    <Image
-                      src={"/logo-title.png"}
-                      alt="logo"
-                      width={300}
-                      height={100}
-                      className="object-cover w-full h-full"
-                      unoptimized
-                    />
-                  </div>
+                <header className="text-center mb-6 flex justify-center">
+                  <Logo />
                 </header>
                 <Clerk.GlobalError className="block text-sm text-red-600" />
                 <Clerk.Field name="identifier">
@@ -120,17 +111,8 @@ export default function SignInSection() {
                 className="w-full space-y-6 rounded-2xl px-4 py-10 sm:w-96 sm:px-8"
               >
                 <SignIn.Strategy name="email_code">
-                  <header className="text-center">
-                    <div className="w-full">
-                      <Image
-                        src={"/logo-title.png"}
-                        alt="logo"
-                        width={300}
-                        height={100}
-                        className="object-cover w-full h-full"
-                        unoptimized
-                      />
-                    </div>
+                  <header className="text-center flex flex-col items-center">
+                    <Logo />
                     <h1 className="mt-4 text-xl font-medium tracking-tight text-neutral-950">
                       Verify email code
                     </h1>
