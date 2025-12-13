@@ -65,10 +65,10 @@ export default function ProfilePageClient({
                     );
 
                     return (
-                      <div className="w-full relative grow">
-                        <div className="max-w-lg xl:max-w-[1600px] mx-auto flex flex-col xl:flex-row items-start justify-center gap-8 px-4 md:px-6 xl:px-0 h-full">
-                          <section className="w-full xl:w-7xl flex flex-col gap-6 shrink xl:sticky xl:top-16">
-                            <div className="px-10 sm:px-16 relative">
+                      <div className="w-full relative grow min-w-0">
+                        <div className="max-w-lg xl:max-w-[1800px] mx-auto flex flex-col xl:flex-row items-start justify-center gap-8 xl:gap-40 px-4 md:px-6 xl:px-0 h-full min-w-0">
+                          <section className="min-w-[420px] max-w-[720px] w-full flex flex-col gap-6 xl:sticky xl:top-16">
+                            <div className="px-8 xl:px-16 relative min-w-0">
                               <ProfileForm
                                 pageId={page.id}
                                 handle={page.handle}
@@ -90,7 +90,7 @@ export default function ProfilePageClient({
                               </div>
                             </div>
                           </section>
-                          <section className="w-[420px] xl:w-[800px] shrink-0 transition-all duration-300 mx-auto xl:mx-0 grow xl:pt-8">
+                          <section className="max-w-dvw shrink-0 transition-all duration-300 mx-auto xl:mx-0 grow xl:pt-8 min-w-0">
                             <ProfileBlocksClient
                               initialLayoutItems={initialLayoutItems}
                               handle={page.handle}

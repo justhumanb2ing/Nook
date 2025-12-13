@@ -16,7 +16,7 @@ export const CANONICAL_BREAKPOINT: GridBreakpoint = "lg";
 export const GRID_COLUMNS = GRID_RESPONSIVE_COLUMNS[CANONICAL_BREAKPOINT];
 export const GRID_ROWS = 175;
 export const GRID_ROW_HEIGHT = 175;
-export const GRID_MARGIN: [number, number] = [26, 26];
+export const GRID_MARGIN: [number, number] = [36, 36];
 export const MIN_SIZE = 1;
 export const MAX_SIZE = GRID_COLUMNS;
 export const LAYOUT_SIZE_SCALE = 2;
@@ -82,8 +82,7 @@ const clampCoordinate = (value: number | null | undefined, max: number) => {
   return Math.min(normalized, Math.max(0, max));
 };
 
-const isLayoutEntry = (source: LayoutSource): source is Layout =>
-  "i" in source;
+const isLayoutEntry = (source: LayoutSource): source is Layout => "i" in source;
 
 const toLayoutId = (source: LayoutSource): string =>
   isLayoutEntry(source) ? source.i : String(source.id);
@@ -168,10 +167,7 @@ export const extractResponsiveLayoutPayload = (
   const desktopColumns = GRID_RESPONSIVE_COLUMNS[DESKTOP_BREAKPOINT];
   const mobileColumns = GRID_RESPONSIVE_COLUMNS[MOBILE_BREAKPOINT];
 
-  const normalizeEntry = (
-    entry: Layout,
-    columns: number
-  ): ViewportLayout => {
+  const normalizeEntry = (entry: Layout, columns: number): ViewportLayout => {
     const width = clampSpan(entry.w, Math.min(columns, MAX_SIZE));
     const height = clampSpan(entry.h, MAX_SIZE);
     const maxX = Math.max(GRID_ROWS - height, 0);

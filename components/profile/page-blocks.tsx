@@ -197,7 +197,7 @@ export default function PageBlocks ({
 
   return (
     <section className="space-y-3 w-full">
-      <div className="w-[420px] xl:w-[800px] shrink-0 transition-all duration-300 mx-auto xl:mx-0">
+      <div className="w-[457px] xl:w-[878px] shrink-0 transition-all duration-300 mx-auto xl:mx-0">
         <ProfileGrid
           layouts={layouts}
           isEditable={isEditable}
