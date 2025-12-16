@@ -28,6 +28,16 @@ export async function generateMetadata(
   // Fetch Page information
   const data = await fetchProfile({ supabase, handle, userId: null });
 
+  if (!data || !data.page.is_public) {
+    return {
+      title: "Not Found",
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
+
   const title = data?.page.title!;
   const description = data?.page.description ?? `${title}'s profile`;
   const imageUrl = data?.page.image_url ?? undefined;
@@ -70,20 +80,22 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     userId: userId ?? null,
   };
 
-  const [data] = await Promise.all([
-    queryClient.fetchQuery({
-      ...profileQueryOptions.byHandle(fetchParams),
-    }),
-    queryClient.prefetchQuery({
-      ...pageQueryOptions.byOwner(userId, supabase, userId ?? null),
-    }),
-  ]);
+  const profilePromise = queryClient.fetchQuery({
+    ...profileQueryOptions.byHandle(fetchParams),
+  });
+
+  const data = await profilePromise;
+
+  if (!data) notFound();
+  if (!data.page.is_public && !data.isOwner) notFound();
+
+  if (data.isOwner) {
+    void queryClient.prefetchQuery({
+      ...pageQueryOptions.byOwner(userId, supabase, userId),
+    });
+  }
 
   const dehydrated = dehydrate(queryClient);
-
-  if (!data) {
-    notFound();
-  }
 
   const profileTitle = data.page.title ?? decodedHandle;
   const profileDescription =

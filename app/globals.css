@@ -172,6 +172,7 @@
 @theme {
   /* 기본 shadow */
   --shadow: 0 0 0 3px #0000000d;
+  --shadow-dark: 0 0 0 3px #8b8b8b39;
 }
 
 /* @theme inline {

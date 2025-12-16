@@ -10,6 +10,8 @@ import "./globals.css";
 import Providers from "./providers";
 import { metadataConfig } from "@/config/metadata-config";
 
+import { Analytics } from "@vercel/analytics/next";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -62,6 +64,7 @@ export default function RootLayout({
               <GoogleTagManager gtmId={GA_MEASUREMENT_ID} />
             </>
           ) : null}
+          <Analytics />
         </body>
       </html>
     </ClerkProvider>

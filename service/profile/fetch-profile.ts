@@ -53,6 +53,17 @@ export const fetchProfile = async (
         if (pageError) throw pageError;
         if (!page) return null;
 
+        const isOwner = Boolean(userId && userId === page.owner_id);
+        const shouldFetchLayout = page.is_public || isOwner;
+
+        if (!shouldFetchLayout) {
+          return {
+            page,
+            isOwner,
+            layout: null,
+          };
+        }
+
         const { data: layouts, error: layoutError } = await supabase.rpc(
           "get_page_layout",
           {
@@ -60,12 +71,14 @@ export const fetchProfile = async (
           }
         );
 
-        if (layoutError) throw layoutError;
+        if (layoutError) {
+          throw layoutError;
+        }
 
         return {
           page,
-          isOwner: Boolean(userId && userId === page.owner_id),
-          layout: (layouts as PageLayout) ?? null,
+          isOwner,
+          layout: layouts ?? null,
         };
       }
     );
